@@ -1,0 +1,280 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                    WHERE YOUR FILES ARE & HOW THEY MOVE                     ║
+║                                                                              ║
+║                          Visual Flow Diagram                                 ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+STARTING POINT: RIGHT NOW - ALL FILES ARE HERE
+═════════════════════════════════════════════════════════════════════════════
+
+                        ┌─────────────────────────┐
+                        │  CLAUDE.AI (Web Chat)   │
+                        │  /mnt/user/outputs/     │
+                        └────────────┬────────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    │                                  │
+           These files exist:                          │
+           • .py files (code)                          │
+           • .md files (guides)                        │
+           • .txt files (docs)                         │
+           • .service file                            │
+                    │                                  │
+            ⚠️  TEMPORARY!                             │
+        Disappear when you close chat                  │
+                    │                                  │
+                    ▼                                  ▼
+         (MUST DOWNLOAD NOW!)              (Can read in chat)
+
+
+STEP 1: DOWNLOAD FILES TO YOUR LAPTOP
+═════════════════════════════════════════════════════════════════════════════
+
+    CLAUDE.AI (Anthropic servers)
+            │
+            │ Click file links
+            │ Download to browser
+            │
+            ▼
+    YOUR LAPTOP BROWSER (Firefox/Chrome/Safari)
+            │
+            │ Files land here:
+            │ ~/Downloads/
+            │
+            ▼
+    Windows:     C:\Users\YourName\Downloads\
+    Mac:         ~/Downloads/
+    Linux:       ~/Downloads/
+
+
+STEP 2: ORGANIZE INTO A PROJECT FOLDER
+═════════════════════════════════════════════════════════════════════════════
+
+    ~/Downloads/
+    ├── nifty_volume_alert_scanner_advanced.py  (you move these)
+    ├── advanced_notifications.py
+    ├── nifty_scanner.service
+    ├── HOW_TO_IMPLEMENT_AND_USE.md
+    ├── FILE_STRUCTURE.md
+    ├── CLAUDE_CODE_WORKFLOW.md
+    └── (other files)
+            │
+            │ mkdir & mv commands
+            │
+            ▼
+    ~/nifty-volume-scanner/
+    ├── nifty_volume_alert_scanner_advanced.py  ✓
+    ├── advanced_notifications.py               ✓
+    ├── nifty_scanner.service                   ✓
+    ├── HOW_TO_IMPLEMENT_AND_USE.md             ✓
+    ├── FILE_STRUCTURE.md                       ✓
+    ├── CLAUDE_CODE_WORKFLOW.md                 ✓
+    └── docs/
+        ├── CONVERSATION_EXPORT.md              ✓
+        ├── ALERT_CONDITIONS_GUIDE.txt          ✓
+        └── (other guides)
+
+
+STEP 3: USE CLAUDE CODE LOCALLY
+═════════════════════════════════════════════════════════════════════════════
+
+    YOUR LAPTOP TERMINAL
+            │
+            │ Commands:
+            │ npm install -g @anthropic-ai/claude-code
+            │ cd ~/nifty-volume-scanner
+            │ claude-code start
+            │
+            ▼
+    CLAUDE CODE (running locally on your machine)
+            │
+            │ Reads from: ~/nifty-volume-scanner/*.py
+            │ Reads from: ~/nifty-volume-scanner/docs/*.md
+            │
+            │ @read docs/CONVERSATION_EXPORT.md
+            │ "Add RSI slope detection"
+            │
+            ▼
+    ENHANCED CODE
+            │
+            │ Still in ~/nifty-volume-scanner/
+            │ Ready to test
+
+
+STEP 4: VERSION CONTROL (OPTIONAL)
+═════════════════════════════════════════════════════════════════════════════
+
+    YOUR LAPTOP TERMINAL
+            │
+            │ cd ~/nifty-volume-scanner
+            │ git init
+            │ git add .
+            │ git commit -m "message"
+            │ git push -u origin main
+            │
+            ▼
+    GITHUB (your repository)
+            │
+            │ https://github.com/yourname/nifty-volume-scanner
+            │
+            │ Backup copy of all code
+
+
+STEP 5: DEPLOY TO YOUR VPS
+═════════════════════════════════════════════════════════════════════════════
+
+    METHOD A: Direct copy from laptop to VPS
+    
+    YOUR LAPTOP TERMINAL
+            │
+            │ scp ~/nifty-volume-scanner/*.py user@VPS_IP:/opt/nifty_scanner/
+            │
+            ▼
+    YOUR VPS (/opt/nifty_scanner/)
+            │
+            │ Files copied here
+
+
+    METHOD B: Clone from GitHub to VPS
+    
+    YOUR VPS SSH TERMINAL
+            │
+            │ cd /opt/nifty_scanner
+            │ git clone https://github.com/yourname/nifty-volume-scanner.git
+            │ or
+            │ git pull origin main
+            │
+            ▼
+    YOUR VPS (/opt/nifty_scanner/)
+            │
+            │ Files cloned here
+
+
+STEP 6: RUN SCANNER ON VPS
+═════════════════════════════════════════════════════════════════════════════
+
+    YOUR VPS SSH TERMINAL
+            │
+            │ sudo systemctl start nifty_scanner
+            │ sudo journalctl -u nifty_scanner -f
+            │
+            ▼
+    SCANNER RUNNING (Linux daemon)
+            │
+            ├─→ Fetches 1-min candles from FINVASIA BROKER API
+            │   (in the cloud)
+            │
+            ├─→ Detects volume spikes
+            │
+            ├─→ Routes to TELEGRAM CHANNELS
+            │   (your phone shows alerts)
+            │
+            └─→ Logs to /var/log/nifty_scanner/
+
+
+STEP 7: CONTINUOUS IMPROVEMENT
+═════════════════════════════════════════════════════════════════════════════
+
+    YOUR LAPTOP TERMINAL (Claude Code)
+            │
+            │ "Add backtest mode"
+            │ "Add RSI slope"
+            │ "Add cross-symbol compression"
+            │
+            ▼
+    ENHANCED CODE (on your laptop)
+            │
+            │ Test locally
+            │ git commit & push
+            │
+            ▼
+    GITHUB (updated)
+            │
+            │ git pull from VPS
+            │
+            ▼
+    YOUR VPS (updated scanner)
+            │
+            │ sudo systemctl restart nifty_scanner
+            │
+            ▼
+    LIVE WITH NEW FEATURES
+
+
+SUMMARY: THE THREE COMPUTERS INVOLVED
+═════════════════════════════════════════════════════════════════════════════
+
+    1️⃣  ANTHROPIC SERVERS (in the cloud)
+        └─ Where files start
+        └─ You access via: Browser (Claude.ai)
+
+    2️⃣  YOUR LAPTOP (Windows/Mac/Linux)
+        └─ Where you develop & enhance
+        └─ You access via: Terminal (claudecode start)
+        └─ Storage: ~/nifty-volume-scanner/
+
+    3️⃣  YOUR VPS (Linux, in the cloud)
+        └─ Where scanner runs 24/7
+        └─ You access via: SSH Terminal
+        └─ Storage: /opt/nifty_scanner/
+
+
+FILE MOVEMENT: FROM CREATION TO LIVE SCANNER
+═════════════════════════════════════════════════════════════════════════════
+
+    Day 1:
+    ------
+    Created in this chat → Anthropic servers
+            │ (click download)
+            ▼ (you access from browser)
+    YOUR LAPTOP ~/Downloads/ → organized to ~/nifty-volume-scanner/
+
+    Day 2-3:
+    ---------
+    ~/nifty-volume-scanner/ → enhanced using Claude Code
+            │ (git push)
+            ▼
+    GITHUB backup
+
+    Day 4:
+    ------
+    GITHUB → pulled to your VPS (/opt/nifty_scanner/)
+            │ (sudo systemctl restart)
+            ▼
+    LIVE SCANNER running on VPS, alerting to your phone
+
+    Every month:
+    -----------
+    Enhance locally → Push to GitHub → Pull to VPS → Restart
+
+
+CRITICAL TIMING: FILES ARE EPHEMERAL
+═════════════════════════════════════════════════════════════════════════════
+
+    RIGHT NOW: Files exist in Anthropic servers
+              Available via this chat browser
+              DOWNLOAD THEM NOW
+              
+    TOMORROW: Close this chat
+             Files might not be accessible
+             Need to have downloaded them
+
+    BEST PRACTICE: Download all files immediately
+                  Store on your laptop
+                  Back up to GitHub
+                  Redeploy to VPS
+
+═════════════════════════════════════════════════════════════════════════════════
+
+WHAT THIS MEANS FOR YOU:
+
+✓ Download NOW while you're reading this
+✓ Save to ~/nifty-volume-scanner/ folder
+✓ Never lose access - you own the files
+✓ Can enhance anytime using Claude Code
+✓ Deploy to VPS whenever ready
+
+═════════════════════════════════════════════════════════════════════════════════

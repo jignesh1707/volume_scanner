@@ -1,0 +1,42 @@
+[Unit]
+Description=Nifty ATM Volume Alert Scanner
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+# Identity
+User=trading
+Group=trading
+WorkingDirectory=/opt/volume_scanner
+
+# Execution
+ExecStart=/usr/bin/python3 /opt/volume_scanner/nifty_volume_alert_scanner_advanced.py
+Restart=always
+RestartSec=10
+
+# Timezone — IST timestamps in logs regardless of VPS locale
+Environment=TZ=Asia/Kolkata
+
+# Resource limits
+MemoryMax=500M
+TasksMax=64
+CPUQuota=50%
+
+# Logging to journald (read with: journalctl -u nifty_scanner -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nifty_scanner
+
+# Security hardening — scanner only writes its own state/logs and the
+# dashboard DB at /opt/shared/dashboard.db (added in block 4).
+NoNewPrivileges=true
+ProtectSystem=strict
+# Scanner writes /var/log/nifty_volume_alerts.log (CONFIG['log_file'] in the
+# script). /opt/shared is for the dashboard DB landed in block 4.
+ReadWritePaths=/opt/volume_scanner /opt/shared /var/log
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

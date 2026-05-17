@@ -1,0 +1,128 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║        FINVASIA/SHOONYA - GET OPTION TOKEN IDS                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 WHAT YOU NEED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each option, you need:
+├─ Token ID (numeric code from broker)
+├─ Symbol name (e.g., "NIFTY26P23900CE")
+├─ Exchange (NSE for spot, NFO for derivatives)
+└─ Current expiry (monthly expiry date)
+
+Examples (TODAY'S ATM roughly):
+├─ NIFTY 26P 23900 CE (Call, ~23900 strike)
+├─ NIFTY 26P 23900 PE (Put, ~23900 strike)
+├─ BANKNIFTY 26P 47500 CE (Call)
+└─ BANKNIFTY 26P 47500 PE (Put)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📲 METHOD 1: FINVASIA MOBILE/WEB APP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Login to your Finvasia trading terminal
+2. Search for: "NIFTY 26P 23900 CE" (or current ATM Call)
+3. Click on the option symbol
+4. Look for "Token" or "Scrip Code" in the details
+   ✅ This is your token ID
+5. Repeat for:
+   ├─ NIFTY ATM Put (26P)
+   ├─ BANKNIFTY ATM Call (26P)
+   └─ BANKNIFTY ATM Put (26P)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 METHOD 2: FINVASIA API - LIST INSTRUMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use Finvasia's instrument list API:
+
+Python example:
+─────────────────────────────────────────────────────────────────────────────
+
+import requests
+
+# Get list of all Nifty options
+response = requests.get(
+    'https://api.shoonya.com/NSE_symbols',
+    params={'token': 'NFO', 'exch': 'NFO'}
+)
+
+data = response.json()
+# Filter by 'NIFTY' and current expiry (26P or 26MAY)
+# Look for symbols like: NIFTY26P23900CE, NIFTY26P23900PE
+
+for symbol_data in data:
+    if 'NIFTY26P23900' in symbol_data['symbol']:
+        print(f"Symbol: {symbol_data['symbol']}")
+        print(f"Token: {symbol_data['token']}")
+        print(f"Exch: {symbol_data['exch']}")
+
+─────────────────────────────────────────────────────────────────────────────
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 METHOD 3: MANUAL - FINVASIA DOCS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Check Finvasia documentation for symbol list:
+https://shoonya.finvasia.com/
+→ API Documentation
+→ Symbols / Instruments
+
+Or download symbol master file:
+https://api.shoonya.com/NFO_symbols
+
+Search for your ATM strike + expiry combo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ UPDATING ATM STRIKES MONTHLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Options expiry is EVERY LAST THURSDAY of month.
+
+When Nifty moves (e.g., goes from 23900 to 24000):
+1. New ATM strike becomes 24000 (closest to spot)
+2. Update symbol in CONFIG:
+   OLD: 'call': 'NIFTY26P23900CE'
+   NEW: 'call': 'NIFTY26P24000CE'
+   
+3. Get new token ID for updated strike
+4. Restart scanner:
+   sudo systemctl restart nifty_scanner
+
+Automation: Create cron job to update based on current spot price
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 QUICK REFERENCE - SAMPLE CONFIG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+'symbols': {
+    'NIFTY': {
+        'call': 'NIFTY26P23900CE',  # ← Token ID from broker (or symbol)
+        'put': 'NIFTY26P23900PE',
+        'exch': 'NFO',  # ← NFO for options, NSE for spot
+    },
+    'BANKNIFTY': {
+        'call': 'BANKNIFTY26P47500CE',
+        'put': 'BANKNIFTY26P47500PE',
+        'exch': 'NFO',
+    },
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔗 FINVASIA API ENDPOINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Base: https://api.shoonya.com
+
+Useful endpoints:
+├─ /NSE_symbols (spot symbols)
+├─ /NFO_symbols (options symbols)
+├─ /history (get candle data)
+├─ /quote (get live quote)
+└─ /search (search by symbol name)
+
+Always check your API token and authentication headers.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

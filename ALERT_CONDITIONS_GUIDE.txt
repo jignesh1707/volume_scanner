@@ -1,0 +1,427 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     ADVANCED ALERT CONDITIONS GUIDE                         ║
+║         Understanding Volume Patterns for Trading Decisions                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 ALERT TYPES OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The advanced scanner sends different alerts for different conditions:
+
+1. BURST - Single candle spike
+2. MOMENTUM_N_CANDLES - Multiple consecutive spikes
+3. CONSECUTIVE_SURGE - 3+ candles with sustained volume
+4. RECOVERY_TO_NORMAL - Volume returning after spike
+5. VOLUME_COMPRESSION - Volume drying up
+
+Plus MAGNITUDE levels: 3x, 5x, 10x, 15x, 20x
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 PATTERN 1: BURST (Single Candle Spike)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What it means:
+  ├─ Volume spike happens in ONE 30-min candle
+  ├─ Followed by (usually) lower volume in next candle
+  ├─ Indicates sudden liquidation/covering in that candle
+  └─ Common in options: expiry pressure, gap fills, quick reversals
+
+Example alert:
+  🔥 SINGLE CANDLE BURST - Volume spike in ONE candle
+  Magnitude: 5x (5.2x average)
+  Severity: MEDIUM
+  Current: 1,000,000 | Avg: 193,000 | Ratio: 5.2x
+
+How to act:
+  
+  IF Severity = SMALL (3x):
+    └─ Monitor, but wait for confirmation
+    └─ Not enough to make decision alone
+    └─ Wait for next candle to confirm direction
+  
+  IF Severity = MEDIUM (5x):
+    ├─ Check RSI → if overbought → short on recovery
+    ├─ Check RSI → if oversold → long on bounce
+    └─ Look for reversal candle in next 30-min
+  
+  IF Severity = LARGE (10x) or EXTREME (20x+):
+    ├─ High probability reversal
+    ├─ If CALL spike: consider PE for next candle
+    ├─ If PUT spike: consider CE for next candle
+    └─ Set tight stops (depends on your risk)
+  
+  KEY: Burst is usually SHORT-LIVED. Next candle often reverses.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📈 PATTERN 2: MOMENTUM_2_CANDLES / MOMENTUM_3_CANDLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What it means:
+  ├─ 2 or 3 consecutive candles with 2x+ average volume
+  ├─ Indicates sustained interest (not just one-off burst)
+  ├─ Volume building = strong conviction
+  └─ Trend continuation likely
+
+Example alert:
+  📈 VOLUME MOMENTUM - 2 consecutive candles with elevated volume
+  Magnitude: 3x (3.4x average)
+  Consecutive candles: 2
+  Severity: SMALL
+
+How to act:
+  
+  IF 2 consecutive + RISING direction:
+    ├─ Trend is building
+    ├─ If ATM CALL: underlying moving up
+    ├─ If ATM PUT: underlying moving down
+    └─ Follow the trend → longer holding period
+  
+  IF 2 consecutive + RSI > 65:
+    ├─ Strong uptrend with volume
+    ├─ Can hold longer, but watch for exhaustion
+    └─ Set trailing stop
+  
+  IF 3 consecutive candles + volume 2x-3x:
+    ├─ Very strong directional move
+    ├─ Jump on the momentum
+    └─ Can hold till end of day
+  
+  KEY: Momentum = SUSTAINED MOVE. NOT a reversal signal.
+       More candles = higher confidence.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ PATTERN 3: CONSECUTIVE_SURGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What it means:
+  ├─ 3+ consecutive candles with sustained 2x+ volume
+  ├─ Stronger version of MOMENTUM pattern
+  ├─ Indicates institutional buying/selling
+  ├─ High probability trend day
+  └─ Volume ACCUMULATION = direction is strong
+
+Example alert:
+  ⚡ SUSTAINED SURGE - Multiple candles with 2.0x+ average volume
+  Magnitude: 5x (5.8x average)
+  Consecutive: 3 candles
+  Severity: MEDIUM
+
+How to act:
+  
+  IF CONSECUTIVE_SURGE + CALL option:
+    ├─ Nifty is moving up with conviction
+    ├─ CALL volume high = buyers are aggressive
+    ├─ Long position has legs
+    └─ Exit only on weakness or lower close
+
+  IF CONSECUTIVE_SURGE + PUT option:
+    ├─ Nifty is moving down with conviction
+    ├─ PUT volume high = sellers are aggressive
+    ├─ Short position has legs
+    └─ Exit only on strength or higher close
+
+  IF CONSECUTIVE_SURGE + RSI > 70:
+    ├─ Overbought AND strong momentum
+    ├─ Trend can continue but watch for reversal
+    ├─ Tighten stops, don't add shorts
+    └─ Wait for RSI to cool before shorting
+
+  TIMING: Usually lasts 1-3 hours (2-6 candles)
+  
+  KEY: This is your BEST trade setup.
+       High volume + direction = predictable movement.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ PATTERN 4: RECOVERY_TO_NORMAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What it means:
+  ├─ Volume was high in previous candle (2x+ average)
+  ├─ Current candle returns to normal (1-1.2x average)
+  ├─ Indicates spike fizzled out / reversal occurred
+  ├─ Supports the next directional move
+  └─ Volume exhaustion = consolidation ahead
+
+Chart visualization:
+  Volume:  ▄▄        (high)
+           ▄▄▂▂      (returns to normal)
+           
+  Could mean:
+    ├─ Liquidation completed
+    ├─ Buyers/sellers stepping back
+    └─ Consolidation before next move
+
+Example alert:
+  ✅ RECOVERY - Volume returning to normal after spike
+  Previous candle volume: 850,000 (4.4x average)
+  Current candle volume: 215,000 (1.1x average)
+  Severity: NOTABLE
+
+How to act:
+  
+  RECOVERY after CALL spike:
+    ├─ If call was up 4%+: consolidating after rally
+    ├─ If underlying was up: next leg up likely after consolidation
+    ├─ Hold long positions if RSI not overbought
+    └─ Exit if RSI > 75 (exhaustion)
+  
+  RECOVERY after PUT spike:
+    ├─ If put was up 4%+: consolidating after rally
+    ├─ If underlying was down: next leg down likely after consolidation
+    ├─ Hold short positions if RSI not oversold
+    └─ Exit if RSI < 25 (exhaustion)
+  
+  RECOVERY + RSI neutral (30-70):
+    ├─ Clean consolidation
+    ├─ Safe to hold or re-enter on continuation
+    └─ Good entry for following the trend
+
+  KEY: Recovery = Pause before next move.
+       Not a reversal signal, but continuation pause.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📉 PATTERN 5: VOLUME_COMPRESSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What it means:
+  ├─ Last 3 candles averaging below 70% of 4-hour average
+  ├─ Volume is DRYING UP
+  ├─ Indicates lack of interest / quiet market
+  ├─ Precursor to a breakout or range consolidation
+  └─ Low volume = unpredictable, easy to whipsaw
+
+Chart visualization:
+  Volume:  ▄▄▄▄     (normal)
+           ▂▂▂▂     (drying up)
+           ▁▁▁▁     (compression)
+
+What happens next:
+    ├─ BREAKOUT (after 15-30 min with volume returning)
+    ├─ FLAT consolidation range
+    └─ Waiting for macro news/event
+
+Example alert:
+  📉 COMPRESSION - Volume drying up below average
+  Last 3 candles average: 95,000
+  4-hour average: 195,000
+  Ratio: 0.49x (about 50% normal volume)
+  Severity: NOTABLE
+
+How to act:
+  
+  COMPRESSION + quiet market:
+    ├─ DO NOT take new positions
+    ├─ Exit existing positions to avoid trap
+    ├─ Wait for volume to return
+    └─ Sideways market = high slippage risk
+  
+  COMPRESSION after strong move:
+    ├─ Indicates end of trend (consolidation)
+    ├─ Exit trend-following positions
+    └─ Wait for volume surge (breakout coming)
+  
+  COMPRESSION + RSI extreme (>75 or <25):
+    ├─ Reversal likely on volume return
+    ├─ Be ready for sharp move
+    └─ Set alerts for next candle opening
+
+  TIMING: Compression usually lasts 20-45 minutes before breakout
+  
+  KEY: Low volume = high risk.
+       Stay away until volume returns.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 MAGNITUDE LEVELS (How big is the spike?)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3x (3.0x average):  SMALL ─ Just above normal, monitor
+5x (5.0x average):  MEDIUM ─ Noticeable, act on it
+10x (10.0x average): LARGE ─ Significant, high probability
+15x (15.0x average): VERY LARGE ─ Rare, almost certain reversal
+20x (20.0x average): EXTREME ─ Panic/capitulation, sharp reversal
+
+Decision Matrix:
+┌─────────────────┬─────────────────────────────────────────────┐
+│ MAGNITUDE       │ ACTION                                      │
+├─────────────────┼─────────────────────────────────────────────┤
+│ 3x BURST        │ Wait for next candle confirmation           │
+│ 5x BURST        │ Reverse position on overbought/oversold     │
+│ 10x BURST       │ Strong reversal signal, act immediately     │
+│ 20x BURST       │ Liquidation, severe reversal coming         │
+│                 │                                             │
+│ 3x MOMENTUM     │ Follow the trend, hold 1-2 more candles     │
+│ 5x MOMENTUM     │ Strong trend, hold till exhaustion          │
+│ 10x MOMENTUM    │ Institutional move, follow till end of day  │
+│                 │                                             │
+│ 3x SURGE        │ Ride the trend, moderate position           │
+│ 5x SURGE        │ Strong conviction move, full size position  │
+│ 10x SURGE       │ Rare, maximum position size                 │
+└─────────────────┴─────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📱 SAMPLE ALERT MESSAGES (What You'll See on Telegram)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ALERT 1: BURST SPIKE
+┌──────────────────────────────────────────────────────────┐
+│ 🔥 SINGLE CANDLE BURST - Volume spike in ONE candle    │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│ Symbol: NIFTY 26P 23900 CE CALL                         │
+│ LTP: ₹45.50 | Close: ₹45.25                            │
+│ VOLUME DATA:                                            │
+│   Current: 1,450,000                                    │
+│   Avg (4h): 293,000                                     │
+│   Ratio: 4.9x                                           │
+│   Level: 5x                                             │
+│ PATTERN: BURST                                          │
+│ Severity: MEDIUM                                        │
+│ RSI (30-min):                                          │
+│   Current: 68.5 🟡 NEUTRAL                            │
+│   Avg (4h): 52.3                                        │
+│ Time: 14:30:00                                          │
+└──────────────────────────────────────────────────────────┘
+
+YOUR DECISION:
+  ├─ RSI 68 = not yet overbought
+  ├─ BURST pattern = likely reversal
+  ├─ Current CALL spike = underlying may have jumped up
+  └─ TRADE: Short NIFTY PE if you're experienced, else wait
+
+ALERT 2: CONSECUTIVE SURGE
+┌──────────────────────────────────────────────────────────┐
+│ ⚡ SUSTAINED SURGE - Multiple candles with 2.0x+ avg   │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│ Symbol: NIFTY 26P 23900 PE PUT                         │
+│ LTP: ₹22.50 | Close: ₹22.85                           │
+│ VOLUME DATA:                                            │
+│   Current: 2,150,000                                    │
+│   Avg (4h): 293,000                                     │
+│   Ratio: 7.3x                                           │
+│   Level: 5x                                             │
+│ PATTERN: MOMENTUM_3_CANDLES                             │
+│   Consecutive candles: 3                                │
+│ Severity: MEDIUM                                        │
+│ RSI (30-min):                                          │
+│   Current: 45.2 🟡 NEUTRAL                            │
+│   Avg (4h): 50.1                                        │
+│ Time: 15:15:00                                          │
+└──────────────────────────────────────────────────────────┘
+
+YOUR DECISION:
+  ├─ 3 consecutive candles = STRONG momentum
+  ├─ PUT volume spike = Nifty moving DOWN
+  ├─ RSI neutral = not exhausted yet
+  ├─ Pattern: MOMENTUM_3_CANDLES
+  └─ TRADE: Long PUT for next 1-2 candles minimum
+
+ALERT 3: RECOVERY
+┌──────────────────────────────────────────────────────────┐
+│ ✅ RECOVERY - Volume returning to normal after spike   │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│ Symbol: NIFTY 26P 23900 CE CALL                         │
+│ LTP: ₹48.75 | Close: ₹48.60                           │
+│ VOLUME DATA:                                            │
+│   Current: 285,000 (normal)                            │
+│   Previous: 1,850,000 (spike)                          │
+│   Avg (4h): 293,000                                     │
+│ PATTERN: RECOVERY_TO_NORMAL                             │
+│ Severity: NOTABLE                                       │
+│ RSI (30-min):                                          │
+│   Current: 72.1 🔴 OVERBOUGHT                         │
+│   Avg (4h): 55.3                                        │
+│ Time: 15:45:00                                          │
+└──────────────────────────────────────────────────────────┘
+
+YOUR DECISION:
+  ├─ Previous spike fizzled (recovered to normal)
+  ├─ CALL in consolidation
+  ├─ RSI overbought = short squeeze complete
+  └─ TRADE: Exit CALL longs, prepare for PE entry
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚙️ QUICK DECISION MATRIX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pattern              │ RSI < 30    │ RSI 30-70   │ RSI > 70
+─────────────────────┼─────────────┼─────────────┼──────────────
+BURST (3-5x)         │ Buy CE      │ Hold        │ Short PE
+BURST (10x+)         │ Strong buy  │ Buy         │ Strong short
+MOMENTUM             │ Fade short  │ Follow      │ Follow trend
+CONSECUTIVE_SURGE    │ Strong buy  │ Full long   │ Full long
+RECOVERY             │ Buy entry   │ Wait        │ Short entry
+COMPRESSION          │ Avoid       │ Avoid       │ Avoid
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 TIPS FOR USING ALERTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. COMBINE WITH PRICE ACTION
+   ├─ Alert alone is not enough
+   ├─ Check if price is moving in same direction
+   ├─ If PE volume spike but price up 10 points: check if liquidation
+   └─ Always cross-check with 1-min/5-min chart
+
+2. WATCH RSI + VOLUME TOGETHER
+   ├─ 10x volume + RSI 80 = likely reversal
+   ├─ 10x volume + RSI 50 = likely continuation
+   ├─ 3x volume + RSI 75 = just consolidation
+   └─ Pattern + RSI + magnitude = high confidence
+
+3. TIMING IS EVERYTHING
+   ├─ BURST at 09:15 = different from BURST at 15:00
+   ├─ Morning spikes = usually covered faster
+   ├─ Afternoon spikes = can run longer
+   ├─ Before expiry = volume means more
+   └─ Track time in your decision
+
+4. COMBINE MULTIPLE SIGNALS
+   ├─ CE + PE both spike = consolidation (ignore)
+   ├─ Only CE spike = directional (act)
+   ├─ CE spike + RSI spike = strong confirmation
+   ├─ CE spike + price flat = trap alert
+   └─ Look for agreement between signals
+
+5. SIZE YOUR POSITION BASED ON PATTERN
+   ├─ BURST 3x = 50% normal position size
+   ├─ BURST 5x = 75% normal position size
+   ├─ BURST 10x = full position or skip
+   ├─ MOMENTUM_3_CANDLES = full position
+   ├─ CONSECUTIVE_SURGE = 1.5x position (if you can)
+   └─ COMPRESSION = 0% (stay out)
+
+6. EXIT SIGNALS
+   ├─ RECOVERY after BURST = exit in next 2 candles
+   ├─ COMPRESSION alert = exit immediately
+   ├─ RSI reaches extreme = tighten stops
+   ├─ 2 candles of MOMENTUM over = reduce position
+   └─ Never hold through lunch/close without plan
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 EXAMPLE TRADING SEQUENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Time    Alert Type              RSI    Price   Action
+─────   ────────────────────    ───    ─────   ──────────────────────
+14:00   (no alert)              52     23900   Waiting
+14:30   BURST (5x) - CE up      68     23920   Price up, but RSI neutral → wait
+15:00   MOMENTUM_2_CANDLES-CE   71     23945   Still going up, RSI rising → BUY CE
+15:30   CONSECUTIVE_SURGE-CE    73     23980   Strong momentum → HOLD CE
+16:00   RECOVERY (CE normal)    75     24010   RSI overbought, consolidating → EXIT CE
+16:30   BURST (3x) - PE up      60     24015   New PE spike, price flat, RSI down → SKIP
+17:00   (quiet)                 55     24000   Compression likely, avoid
+17:30   (no alert)              48     23950   Market quiet
+18:00   BURST (4x) - PE up      42     23900   PE spike when oversold → BUY PE
+18:30   MOMENTUM_2_CANDLES-PE   38     23850   Strong down move → HOLD PE
+19:00   RECOVERY (PE normal)    35     23800   RSI extreme oversold → EXIT PE
+
+Total: 3 successful trades from alerts
+
+Key learnings:
+  ├─ Only acted on MOMENTUM (sustained moves)
+  ├─ Avoided BURST at overbought/oversold extremes
+  ├─ Used RSI to confirm direction
+  ├─ Exited on RECOVERY signal
+  └─ Sat out COMPRESSION periods
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

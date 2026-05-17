@@ -1,0 +1,424 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║          ADVANCED SCANNER - CONFIGURATION & TUNING GUIDE                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 CONFIG SECTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The CONFIG dict has these main sections:
+
+1. Credentials (unchanged from basic)
+   ├─ broker_api_key
+   ├─ broker_token
+   ├─ telegram_bot_token
+   └─ telegram_chat_id
+
+2. Scanning Parameters (timing)
+   ├─ scan_interval_sec
+   └─ lookback_hours
+
+3. ⭐ VOLUME THRESHOLDS (new)
+   └─ Granular control over alert levels
+
+4. ⭐ PATTERN DETECTION (new)
+   ├─ Consecutive candle detection
+   ├─ Pattern type detection
+   └─ Feature toggles
+
+5. Symbols (unchanged)
+   └─ Your ATM options
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎚️ TUNING VOLUME THRESHOLDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Default configuration:
+
+'volume_thresholds': {
+    '3x': 3.0,      # Alert when volume is 3x average
+    '5x': 5.0,      # Alert when volume is 5x average
+    '10x': 10.0,    # Alert when volume is 10x average
+    '15x': 15.0,    # Alert when volume is 15x average
+    '20x': 20.0,    # Alert when volume is 20x average
+}
+
+WHAT EACH THRESHOLD MEANS:
+
+'3x': 3.0
+  ├─ Severity: SMALL
+  ├─ When to use: High volatility markets where you want all alerts
+  ├─ False positives: Many (lots of noise)
+  ├─ Best for: Intraday traders who act fast
+  └─ Example: "Current volume 300k, average 100k" → 3x alert
+
+'5x': 5.0
+  ├─ Severity: MEDIUM
+  ├─ When to use: Standard, good balance of signal/noise
+  ├─ False positives: Some
+  ├─ Best for: Most traders, default recommendation
+  └─ Example: "Current volume 500k, average 100k" → 5x alert
+
+'10x': 10.0
+  ├─ Severity: LARGE
+  ├─ When to use: Only significant moves matter
+  ├─ False positives: Very few, high quality alerts
+  ├─ Best for: Conservative traders, less screen time
+  └─ Example: "Current volume 1M, average 100k" → 10x alert
+
+'15x': 15.0
+  ├─ Severity: VERY LARGE
+  ├─ When to use: Rare, usually indicates panic/liquidation
+  ├─ False positives: Almost none
+  ├─ Best for: Trading the extremes
+  └─ Example: "Current volume 1.5M, average 100k" → 15x alert
+
+'20x': 20.0
+  ├─ Severity: EXTREME
+  ├─ When to use: Capitulation moves, strong reversals
+  ├─ False positives: None (very rare event)
+  ├─ Best for: Risk management (exit signal)
+  └─ Example: "Current volume 2M, average 100k" → 20x alert
+
+CUSTOMIZATION OPTIONS:
+
+Option 1: AGGRESSIVE (want all alerts)
+───────────────────────────────────────
+'volume_thresholds': {
+    '2x': 2.0,      # Add lower threshold
+    '3x': 3.0,
+    '4x': 4.0,      # Add intermediate
+    '5x': 5.0,
+    '10x': 10.0,
+}
+→ More alerts, higher false positive rate
+→ Use if you have time to monitor
+
+Option 2: CONSERVATIVE (only significant moves)
+────────────────────────────────────────────────
+'volume_thresholds': {
+    '5x': 5.0,      # Skip 3x
+    '10x': 10.0,
+    '15x': 15.0,    # Add very large
+    '20x': 20.0,
+}
+→ Fewer alerts, high quality signals
+→ Use if you trade less frequently
+
+Option 3: FOCUSED (for your strategy)
+──────────────────────────────────────
+Example: You care about reversal patterns (3x & 10x+)
+
+'volume_thresholds': {
+    '3x': 3.0,      # BURST candidates
+    '10x': 10.0,    # Strong reversals
+    '15x': 15.0,    # Panic mode
+}
+→ Skip 5x to reduce middle-range noise
+→ Alerts are focused on key levels
+
+HOW TO CHANGE:
+
+Edit the CONFIG dict in nifty_volume_alert_scanner_advanced.py:
+
+CONFIG = {
+    ...
+    'volume_thresholds': {
+        '3x': 3.0,
+        '5x': 5.0,      # ← Change this
+        '10x': 10.0,    # ← Or this
+        '15x': 15.0,
+        '20x': 20.0,
+    },
+    ...
+}
+
+Then restart:
+  sudo systemctl restart nifty_scanner
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 CONSECUTIVE CANDLE DETECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Controls when the scanner detects MOMENTUM vs BURST patterns.
+
+'consecutive_spike_threshold': 2.0
+  ├─ Volume considered "elevated" if > 2.0x average
+  ├─ Lower = more candles labeled as "consecutive"
+  ├─ Default 2.0 = standard
+  ├─ Range: 1.5 - 3.0
+  └─ What it does:
+       Volume of 150k with 75k average:
+       - 2.0 threshold: 150k = 2.0x → NO alert (not enough)
+       - 1.5 threshold: 150k = 2.0x → YES alert (enough)
+
+'consecutive_candle_count': 3
+  ├─ Alert MOMENTUM after 3 consecutive elevated candles
+  ├─ Higher = waits longer for more candles
+  ├─ Lower = quicker to alert
+  ├─ Default 3 = good balance
+  ├─ Range: 2 - 5
+  └─ Examples:
+       consecutive_candle_count = 2:
+         → Alerts on MOMENTUM_2_CANDLES faster
+         → More alerts, some might be false
+       
+       consecutive_candle_count = 4:
+         → Only alerts on 4+ candle patterns
+         → Higher confidence, fewer alerts
+
+EXAMPLES:
+
+Scenario 1: Low volatility market (calm day)
+──────────────────────────────────────────
+'consecutive_spike_threshold': 1.8,    # Lower threshold
+'consecutive_candle_count': 2,         # Alert quicker
+
+→ Catches small sustained moves
+→ Good for when market is quiet
+
+Scenario 2: High volatility market (trending day)
+─────────────────────────────────────────────────
+'consecutive_spike_threshold': 2.5,    # Higher threshold
+'consecutive_candle_count': 4,         # Wait for 4 candles
+
+→ Filters out noise
+→ Only catches strong trends
+
+Scenario 3: Default (balanced)
+──────────────────────────────
+'consecutive_spike_threshold': 2.0,
+'consecutive_candle_count': 3,
+
+→ Good for most market conditions
+→ Recommended starting point
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ PATTERN DETECTION TOGGLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+'detect_burst_pattern': True
+  ├─ Alert on single candle spikes (BURST)
+  ├─ Set to False to ignore bursts, only track momentum
+  └─ Recommendation: Keep True (most traders care about bursts)
+
+'detect_recovery_pattern': True
+  ├─ Alert when volume returns to normal after spike (RECOVERY)
+  ├─ Useful for confirming end of spike
+  ├─ Set to False if you don't care about recovery signals
+  └─ Recommendation: Keep True (helps with exit timing)
+
+'detect_volume_compression': True
+  ├─ Alert when volume dries up below 70% of average
+  ├─ Useful for avoiding low-volume traps
+  ├─ Set to False if compression alerts are noise for you
+  └─ Recommendation: Keep True (good risk management)
+
+COMBINATIONS:
+
+Conservative (only trending moves):
+──────────────────────────────────
+'detect_burst_pattern': False,         # Ignore one-off spikes
+'detect_recovery_pattern': False,      # Ignore end signals
+'detect_volume_compression': True,     # But avoid traps
+
+→ Only MOMENTUM and SURGE alerts
+→ Less noise, higher quality
+
+Aggressive (catch everything):
+──────────────────────────────
+'detect_burst_pattern': True,
+'detect_recovery_pattern': True,
+'detect_volume_compression': True,
+
+→ All signals active
+→ More alerts, requires active monitoring
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏱️ SCAN INTERVAL & LOOKBACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+'scan_interval_sec': 30
+  ├─ Check for new candles every 30 seconds
+  ├─ Lower = faster response, more CPU
+  ├─ Range: 10 - 120 seconds
+  ├─ Recommendation: 30 (good balance)
+  └─ Examples:
+       10 sec: Ultra-responsive, 8% CPU on average VPS
+       30 sec: Standard, <1% CPU
+       60 sec: Relaxed, minimal CPU, slower alerts
+
+'lookback_hours': 4
+  ├─ Calculate average volume from last 4 hours
+  ├─ Higher = smoother average, catches larger moves
+  ├─ Lower = more sensitive average, more alerts
+  ├─ Range: 2 - 6 hours
+  ├─ Recommendation: 4 (standard)
+  └─ Examples:
+       2 hours: More alerts, faster to detect changes
+       4 hours: Balanced, standard
+       6 hours: Fewer alerts, only extreme moves
+
+IMPACT OF CHANGING lookback_hours:
+
+Market behavior: Volume average 100k per candle
+
+With lookback_hours = 2 (last 4 candles):
+  ├─ Current volume 250k
+  ├─ Average = (100+100+100+100)/4 = 100k
+  ├─ Ratio = 2.5x → Alert at 3x threshold = NO
+  └─ More responsive to recent changes
+
+With lookback_hours = 4 (last 8 candles):
+  ├─ Current volume 250k
+  ├─ Average = (100+100+100+100+100+100+100+100)/8 = 100k
+  ├─ Ratio = 2.5x → Alert at 3x threshold = NO
+  └─ Same in this example, but...
+
+Real scenario: Volume just doubled from 50k to 200k
+  
+  With lookback_hours = 2:
+    Average = (50+50+50+50)/4 = 50k
+    250k volume = 5x → Alert YES
+  
+  With lookback_hours = 4:
+    Average = (100+100+50+50+50+50+50+50)/8 = 68k
+    250k volume = 3.7x → Alert YES
+
+OPTIMIZATION:
+
+Fast market (lots of movement):
+  'scan_interval_sec': 20,
+  'lookback_hours': 2,
+  └─ More responsive, catches quick moves
+
+Calm market (less movement):
+  'scan_interval_sec': 60,
+  'lookback_hours': 4,
+  └─ Fewer alerts, focuses on significant events
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 STRATEGY-SPECIFIC CONFIGURATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SETUP 1: SCALPER (Hold 1-2 candles, 30-min)
+─────────────────────────────────────────────
+'volume_thresholds': {
+    '3x': 3.0,
+    '5x': 5.0,
+    '10x': 10.0,
+}
+'consecutive_spike_threshold': 1.5,
+'consecutive_candle_count': 2,
+'scan_interval_sec': 20,
+'lookback_hours': 2,
+'detect_burst_pattern': True,
+'detect_recovery_pattern': True,
+'detect_volume_compression': True,
+
+→ Aggressive, catches all moves
+→ Fast alerts for quick entries/exits
+
+SETUP 2: SWING TRADER (Hold 1-5 hours)
+────────────────────────────────────────
+'volume_thresholds': {
+    '5x': 5.0,
+    '10x': 10.0,
+    '15x': 15.0,
+}
+'consecutive_spike_threshold': 2.0,
+'consecutive_candle_count': 3,
+'scan_interval_sec': 30,
+'lookback_hours': 4,
+'detect_burst_pattern': True,
+'detect_recovery_pattern': True,
+'detect_volume_compression': True,
+
+→ Balanced configuration
+→ Recommended default
+
+SETUP 3: POSITION TRADER (Hold days, focus on reversals)
+──────────────────────────────────────────────────────────
+'volume_thresholds': {
+    '10x': 10.0,
+    '15x': 15.0,
+    '20x': 20.0,
+}
+'consecutive_spike_threshold': 2.5,
+'consecutive_candle_count': 4,
+'scan_interval_sec': 60,
+'lookback_hours': 6,
+'detect_burst_pattern': True,
+'detect_recovery_pattern': False,
+'detect_volume_compression': True,
+
+→ Conservative, only significant moves
+→ Low false positives
+→ Less alert noise
+
+SETUP 4: MOMENTUM TRADER (Follow strong trends)
+─────────────────────────────────────────────────
+'volume_thresholds': {
+    '5x': 5.0,
+    '10x': 10.0,
+}
+'consecutive_spike_threshold': 1.8,
+'consecutive_candle_count': 2,
+'scan_interval_sec': 30,
+'lookback_hours': 3,
+'detect_burst_pattern': False,        # Skip bursts
+'detect_recovery_pattern': False,     # Skip recoveries
+'detect_volume_compression': True,    # But respect compression
+
+→ Focused on MOMENTUM alerts
+→ Ignores noise, follows trends
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 A/B TESTING CONFIGURATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Want to test which config is best? Keep track:
+
+Day 1 (CONFIG A - Aggressive):
+  ├─ Alerts received: 47
+  ├─ Trades taken: 12
+  ├─ Winning trades: 7
+  ├─ Win rate: 58%
+  └─ Notes: Too many alerts, hard to keep up
+
+Day 2 (CONFIG B - Balanced):
+  ├─ Alerts received: 23
+  ├─ Trades taken: 8
+  ├─ Winning trades: 6
+  ├─ Win rate: 75%
+  └─ Notes: Sweet spot, actionable
+
+Day 3 (CONFIG C - Conservative):
+  ├─ Alerts received: 8
+  ├─ Trades taken: 5
+  ├─ Winning trades: 5
+  ├─ Win rate: 100%
+  └─ Notes: Too conservative, missing moves
+
+Conclusion: CONFIG B is best for this trader.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ CONFIGURATION CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before deploying:
+
+☐ Credentials configured (broker + telegram)
+☐ Symbol tokens updated (current ATM strikes)
+☐ volume_thresholds chosen based on your style
+☐ consecutive parameters tuned for market conditions
+☐ Pattern detection toggles set (on/off)
+☐ Scan interval matches your monitoring capability
+☐ Lookback hours appropriate for your timeframe
+☐ Configuration saved and service restarted
+☐ Test 1-2 hours to see alert frequency
+☐ Adjust if needed and restart
+
+Start with SETUP 2 (Swing Trader) if unsure.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

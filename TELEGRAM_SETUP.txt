@@ -1,0 +1,122 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║        TELEGRAM BOT SETUP - Nifty Volume Alert Scanner                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 STEP 1: CREATE TELEGRAM BOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open Telegram app or web.telegram.org
+2. Search for: @BotFather
+3. Send: /start
+4. Send: /newbot
+5. Follow prompts:
+   - Bot name: "Nifty Volume Alerts" (or anything)
+   - Bot username: "nifty_volume_alerts_bot" (must be unique, end with _bot)
+6. BotFather will give you:
+   
+   ✅ Your HTTP API token:
+   ┌─ 123456789:ABCDEFGHijklmnopqrstuvwxyz1234567890
+   └─ This is your: telegram_bot_token
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 STEP 2: GET YOUR CHAT ID
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option A - Using the bot directly:
+1. Find your newly created bot in Telegram search
+2. Send: /start
+3. Save the bot (so you can find it later)
+4. Open browser and go to:
+   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+   
+   Replace <YOUR_BOT_TOKEN> with your actual token from step 1
+   
+   You'll see JSON response with "chat":{"id": YOUR_CHAT_ID}
+   
+   ✅ Copy that number - this is your: telegram_chat_id
+
+Option B - Using curl from terminal:
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 STEP 3: SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For production, use environment variables instead of hardcoding:
+
+Edit: /opt/nifty_scanner/.env
+───────────────────────────────
+TELEGRAM_BOT_TOKEN=123456789:ABCDEFGHijklmnopqrstuvwxyz1234567890
+TELEGRAM_CHAT_ID=123456789
+FINVASIA_API_KEY=your_api_key
+FINVASIA_TOKEN=your_token
+
+Then in script, load from .env:
+import os
+from dotenv import load_dotenv
+
+load_dotenv('/opt/nifty_scanner/.env')
+CONFIG['telegram_bot_token'] = os.getenv('TELEGRAM_BOT_TOKEN')
+CONFIG['telegram_chat_id'] = os.getenv('TELEGRAM_CHAT_ID')
+
+Permission:
+chmod 600 /opt/nifty_scanner/.env
+chown trading:trading /opt/nifty_scanner/.env
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TESTING THE BOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test message using curl:
+
+curl -X POST https://api.telegram.org/bot<YOUR_BOT_TOKEN>/sendMessage \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": "<YOUR_CHAT_ID>", "text": "🚀 Bot is working!"}'
+
+If you see message in Telegram → Setup is correct!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📱 MOBILE NOTIFICATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Telegram notifications on phone:
+✓ Telegram app shows push notifications (enable in settings)
+✓ Alerts appear in chat history
+✓ Can set custom notifications per chat
+
+Optional: Add to bot command menu via BotFather:
+/start - Start receiving alerts
+/stop - Pause alerts
+/status - Check current position
+/config - View scanner settings
+
+Set commands in BotFather:
+/setcommands
+
+name /start
+description Start receiving alerts
+
+etc.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🐛 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: Bot token not working
+→ Check BotFather response, make sure you copied full token with colon
+
+Problem: Chat ID wrong
+→ Send message to bot, run getUpdates API again
+→ Make sure you're checking right "chat" object
+
+Problem: Alerts not appearing
+→ Check logs: journalctl -u nifty_scanner -f
+→ Verify telegram_bot_token and telegram_chat_id in CONFIG
+→ Test curl command above
+
+Problem: "Unauthorized" error
+→ Token might be expired (rarely) - create new bot
+→ Check if you copied token correctly (no spaces)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

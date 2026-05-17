@@ -1,0 +1,270 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                  VOLUME ALERT SCANNER - QUICK REFERENCE                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 WHAT YOU GET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ MAIN SCRIPT
+   nifty_volume_alert_scanner.py (800 lines)
+   └─ Production-ready volume scanner with RSI context
+   └─ Monitors 30-min candles, calculates rolling averages
+   └─ Sends Telegram alerts + SMS (optional)
+   └─ Runs as daemon, auto-restarts on VPS reboot
+
+✅ GUIDES (Follow in this order)
+   1. README.md .......................... Start here
+   2. TELEGRAM_SETUP.txt ................. Create bot + get credentials
+   3. BROKER_TOKEN_GUIDE.txt ............. Find option token IDs
+   4. CONFIG_TEMPLATE.py ................. Annotated configuration
+   5. SETUP_GUIDE.sh ..................... One-command VPS setup
+
+✅ TOOLS
+   test_setup.py ........................ Verify all connections work
+   nifty_scanner.service ............... Systemd service file
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ 10-MINUTE SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SSH to your VPS
+2. Download all files to /tmp
+3. Run: sudo bash SETUP_GUIDE.sh
+4. Read TELEGRAM_SETUP.txt, create bot, get credentials
+5. Read BROKER_TOKEN_GUIDE.txt, find option token IDs
+6. Edit: sudo nano /opt/nifty_scanner/nifty_volume_alert_scanner.py
+   - Update CONFIG with credentials
+7. Test: python3 test_setup.py
+8. Deploy: sudo systemctl start nifty_scanner
+9. Verify: sudo journalctl -u nifty_scanner -f
+
+Done! Alerts will arrive on your Telegram.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 KEY FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VOLUME SPIKE DETECTION
+  ✓ 3x, 4x, 6x, 10x multiplier alerts (customizable)
+  ✓ 4-hour rolling average baseline
+  ✓ Separate current vs average volume reporting
+  ✓ Per-symbol tracking with cooldown
+
+RSI CONTEXT
+  ✓ Current RSI vs 4-hour average RSI
+  ✓ 14-period Wilder's RSI calculation
+  ✓ Helps identify overbought/oversold conditions
+
+NOTIFICATIONS
+  ✓ Telegram push notifications (mobile)
+  ✓ HTML formatted alerts with bold/emphasis
+  ✓ SMS support (optional - configure provider)
+  ✓ 5-min cooldown per alert to prevent spam
+
+MONITORING
+  ✓ 30-minute candle interval (ideal for swing trades)
+  ✓ Independent CALL/PUT tracking
+  ✓ Multiple option pairs (Nifty, BankNifty, etc)
+  ✓ Live logs and systemd integration
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 CONFIGURATION CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE DEPLOYMENT, YOU NEED:
+
+☐ Finvasia API credentials
+  └─ broker_api_key: Your API key from Finvasia
+  └─ broker_token: Your user ID / session token
+
+☐ Telegram bot credentials
+  └─ telegram_bot_token: From @BotFather (123...:ABC...)
+  └─ telegram_chat_id: Your personal chat ID (digits)
+
+☐ Current ATM option symbols
+  └─ NIFTY ATM CALL symbol (e.g., NIFTY26P23900CE)
+  └─ NIFTY ATM PUT symbol (e.g., NIFTY26P23900PE)
+  └─ BANKNIFTY ATM CALL symbol
+  └─ BANKNIFTY ATM PUT symbol
+  └─ Exact token IDs from broker
+
+☐ VPS with Python 3.8+
+  └─ At least 100MB RAM
+  └─ 20MB disk space
+  └─ Internet connectivity
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 DEPLOYMENT COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# SETUP
+sudo bash SETUP_GUIDE.sh
+
+# CONFIGURE
+sudo nano /opt/nifty_scanner/nifty_volume_alert_scanner.py
+
+# TEST
+cd /opt/nifty_scanner
+python3 test_setup.py
+
+# START
+sudo systemctl start nifty_scanner
+sudo systemctl enable nifty_scanner
+
+# MONITOR
+sudo journalctl -u nifty_scanner -f
+tail -f /var/log/nifty_scanner/nifty_volume_alerts.log
+
+# RESTART (after config change)
+sudo systemctl restart nifty_scanner
+
+# STOP
+sudo systemctl stop nifty_scanner
+
+# STATUS
+sudo systemctl status nifty_scanner
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 EXAMPLE ALERT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When volume spike detected, Telegram shows:
+
+  🚨 VOLUME SPIKE ALERT 🚨
+  Symbol: NIFTY 26P 23900 CE
+  LTP: ₹45.50
+  Current Volume: 2,450,000
+  Avg Volume (4h): 450,000
+  Spike Ratio: 5x
+  Current RSI: 72.3 (Avg: 55.2)
+  Time: 14:30:45
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 CUSTOMIZATION OPTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Adjust these in CONFIG to tune for your strategy:
+
+scan_interval_sec = 30       → Change check frequency
+lookback_hours = 4           → Change baseline window
+volume_multipliers = [3,4,6] → Change alert thresholds
+rsi_period = 14              → Change RSI calculation
+rsi_threshold_overbought=70  → Informational only
+rsi_threshold_oversold=30    → Informational only
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚙️ MONTHLY MAINTENANCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Options expiry: LAST THURSDAY of every month
+
+When expiry rolls:
+  1. Find new ATM strike prices (Nifty current spot ±100)
+  2. Get new token IDs from broker
+  3. Update symbols in CONFIG
+  4. sudo systemctl restart nifty_scanner
+
+Example:
+  OLD: 'call': 'NIFTY26P23900CE'
+  NEW: 'call': 'NIFTY27P24000CE'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🆘 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NO ALERTS?
+  → Check Telegram credentials: python3 test_setup.py
+  → Check symbols in CONFIG (not 'YOUR_...')
+  → Check broker API key valid
+  → Check volume actually spiking (may not in low volatility)
+
+SCANNER WON'T START?
+  → Check config: sudo nano /opt/nifty_scanner/nifty_volume_alert_scanner.py
+  → Check systemd: sudo systemctl status nifty_scanner -l
+  → Check logs: sudo journalctl -u nifty_scanner -n 50
+
+ALERTS TOO FREQUENT?
+  → Increase scan_interval_sec (30 → 60)
+  → Increase lookback_hours (4 → 6)
+  → Reduce volume_multipliers [3,4,6,10] → [4,6,10]
+
+HIGH CPU?
+  → Increase scan_interval_sec
+  → Check for API timeout loops in logs
+
+See README.md TROUBLESHOOTING section for more help.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📞 TECHNICAL DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Data source:        Finvasia/Shoonya API (30-min candles)
+Candle interval:    30 minutes
+Indicators:         RSI (Wilder's 14), Volume average
+Timeframe:          4-hour lookback for baseline
+Notifications:      Telegram Bot API + SMS (optional)
+Runtime:            24/7 as systemd daemon
+Language:           Python 3.8+
+Dependencies:       requests (pip install requests)
+Memory usage:       ~50-100 MB
+CPU usage:          <1% average (idle scan)
+Permissions:        Runs as 'trading' user (unprivileged)
+Logging:            Systemd journal + file log
+Auto-restart:       Yes (systemd)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 FILE GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+nifty_volume_alert_scanner.py
+  └─ Main scanner. Copy to /opt/nifty_scanner/
+  └─ Edit CONFIG section with credentials
+  └─ ~800 lines, fully commented
+
+nifty_scanner.service
+  └─ Systemd service file. Install in /etc/systemd/system/
+  └─ Runs scanner as daemon, auto-start on reboot
+  └─ Resource limits: 500MB RAM, 50% CPU
+
+README.md
+  └─ Complete documentation
+  └─ Installation, maintenance, troubleshooting
+  └─ Start here!
+
+TELEGRAM_SETUP.txt
+  └─ Step-by-step Telegram bot creation
+  └─ How to get bot token + chat ID
+  └─ Testing procedure
+
+BROKER_TOKEN_GUIDE.txt
+  └─ How to find option token IDs from Finvasia
+  └─ Three methods: App, API, Manual
+  └─ Monthly expiry rollover instructions
+
+CONFIG_TEMPLATE.py
+  └─ Annotated configuration template
+  └─ Every option explained inline
+  └─ Use as reference while editing script
+
+test_setup.py
+  └─ Verification script
+  └─ Tests: Telegram, Broker API, Symbols, Network
+  └─ Run before deployment
+
+SETUP_GUIDE.sh
+  └─ One-command VPS setup
+  └─ Installs dependencies, creates user, installs service
+  └─ Non-interactive (safe to run as root)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ READY? GO!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Start with README.md and follow the guides in order.
+
+Questions? Check README.md troubleshooting section.
+
+Good luck! 🚀
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

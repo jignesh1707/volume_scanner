@@ -1,0 +1,523 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                  MULTI-CHANNEL ALERT NOTIFICATION SETUP                     ║
+║            Never Miss an Alert - Sound, Pop-ups, Multiple Channels          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 NOTIFICATION CHANNELS (Choose What You Want)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ✅ TELEGRAM ALERTS (Multiple channels by severity)
+   └─ EXTREME alerts → Loud siren channel (@everyone)
+   └─ LARGE alerts → Separate channel
+   └─ MEDIUM alerts → Another channel
+   └─ SMALL alerts → Personal chat
+   └─ What you get: Push notifications on phone, loud sound
+
+2. 🔊 SOUND ALERTS (Plays audio files)
+   └─ EXTREME: Loud siren sound
+   └─ LARGE: Emergency alarm
+   └─ MEDIUM: Alert beep
+   └─ SMALL: Soft ding
+   └─ What you get: Audible notification on VPS speaker
+
+3. 🖥️ DESKTOP/SYSTEM NOTIFICATIONS (Linux/Mac/Windows)
+   └─ Pops up on your desktop/laptop
+   └─ Critical level notification
+   └─ 10-second on-screen alert
+   └─ What you get: Can't miss visual popup
+
+4. 📧 EMAIL ALERTS (Critical only)
+   └─ Only for EXTREME alerts
+   └─ Instant email to your inbox
+   └─ What you get: Backup notification
+
+5. 💬 DISCORD WEBHOOKS (Optional team alerts)
+   └─ Send to Discord server/channel
+   └─ Mention team members (@here, @channel)
+   └─ Color-coded embeds
+   └─ What you get: Team awareness
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ ALERT SEVERITY LEVELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXTREME (20x+ or SURGE pattern):
+  🚨 EXTREME TELEGRAM CHANNEL
+  🔊 LOUD SIREN SOUND (100% volume)
+  🖥️ CRITICAL DESKTOP POPUP
+  📧 EMAIL to inbox
+  └─ CANNOT MISS THIS
+
+LARGE (10x+ volume):
+  ⚠️ LARGE TELEGRAM CHANNEL
+  🔊 ALARM SOUND (90% volume)
+  🖥️ CRITICAL DESKTOP POPUP
+  └─ VERY HARD TO MISS
+
+MEDIUM (5x+ volume):
+  ⚡ MEDIUM TELEGRAM CHANNEL
+  🔊 ALERT SOUND (70% volume)
+  🖥️ NORMAL DESKTOP POPUP
+  └─ DEFINITELY NOTICEABLE
+
+SMALL (3-5x volume):
+  📊 PERSONAL TELEGRAM
+  🔊 SOFT DING (50% volume)
+  🖥️ LOW PRIORITY POPUP
+  └─ FOR REFERENCE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣ SETUP TELEGRAM MULTIPLE CHANNELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create separate Telegram channels for each alert level:
+
+STEP 1: Create Telegram Channels
+─────────────────────────────────
+
+On your phone:
+  1. Open Telegram
+  2. Tap "+" (compose)
+  3. Select "New Channel"
+  
+  Create 4 channels:
+  ├─ "NIFTY_EXTREME_ALERTS" (private, only you)
+  ├─ "NIFTY_LARGE_ALERTS"
+  ├─ "NIFTY_MEDIUM_ALERTS"
+  └─ "NIFTY_SMALL_ALERTS"
+
+STEP 2: Add Your Bot to Each Channel
+────────────────────────────────────
+
+In each channel:
+  1. Tap channel name (top)
+  2. Tap "Members" → "Add members"
+  3. Search for your bot name (from @BotFather)
+  4. Select bot and add as ADMIN
+  5. Make bot admin (tap bot → tap menu → "Promote to admin")
+
+STEP 3: Get Channel IDs
+──────────────────────
+
+For each channel:
+  1. Post a test message
+  2. Forward that message to @userinfobot
+  3. It will show your channel ID
+  4. Format: -100123456789
+
+Get your bot token first (if you don't have):
+  1. Open @BotFather
+  2. Send /newbot
+  3. Follow prompts
+  4. Get bot token: 123456789:ABCDEFGHijklmnopqrstuvwxyz
+
+STEP 4: Update Config
+─────────────────────
+
+In advanced_notifications.py:
+
+NOTIFICATION_CONFIG = {
+    'telegram': {
+        'enabled': True,
+        'bot_token': '123456789:ABCDEFGHijklmnopqrstuvwxyz',
+        
+        'channels': {
+            'EXTREME': {
+                'chat_id': '-100123456789',  # EXTREME channel ID
+                'name': '🚨 EXTREME ALERTS',
+                'mention': '@here',  # Only works in groups
+            },
+            'LARGE': {
+                'chat_id': '-100123456790',  # LARGE channel ID
+                'name': '⚠️ LARGE ALERTS',
+                'mention': None,
+            },
+            'MEDIUM': {
+                'chat_id': '-100123456791',  # MEDIUM channel ID
+                'name': '⚡ MEDIUM ALERTS',
+                'mention': None,
+            },
+            'SMALL': {
+                'chat_id': '123456789',  # Your personal chat ID
+                'name': '📊 SMALL ALERTS',
+                'mention': None,
+            },
+        }
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2️⃣ SETUP SOUND ALERTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Sound files are CRITICAL - you'll hear the alerts!
+
+STEP 1: Install Audio Player
+────────────────────────────
+
+On your VPS:
+  
+  # Ubuntu/Debian
+  sudo apt-get install pulseaudio
+  
+  # Or for ALSA:
+  sudo apt-get install alsa-utils
+
+STEP 2: Create Sounds Directory
+───────────────────────────────
+
+  mkdir -p /opt/nifty_scanner/sounds
+  cd /opt/nifty_scanner/sounds
+
+STEP 3: Get Sound Files
+──────────────────────
+
+Option A: Download free sounds
+
+  # Siren (EXTREME)
+  wget https://example.com/siren.wav -O siren_extreme.wav
+  
+  # Alarm (LARGE)
+  wget https://example.com/alarm.wav -O alarm_large.wav
+  
+  # Alert (MEDIUM)
+  wget https://example.com/alert.mp3 -O alert_medium.mp3
+  
+  # Ding (SMALL)
+  wget https://example.com/ding.mp3 -O ding_small.mp3
+
+Option B: Create your own using ffmpeg
+
+  # Create siren sound (0.5 seconds)
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=0.5 siren_extreme.wav
+  
+  # Create alarm (1 second)
+  ffmpeg -f lavfi -i sine=frequency=800:duration=1 alarm_large.wav
+
+Option C: Use system beep (fallback)
+
+  # Just requires beep package
+  sudo apt-get install beep
+  
+  # Then manually play:
+  beep -f 1000 -l 500
+
+RECOMMENDED SOUND SOURCES:
+  ├─ Zapsplat (free): https://www.zapsplat.com/
+  ├─ Freesound (free): https://freesound.org/
+  ├─ Mixkit (free): https://mixkit.co/
+  └─ Pixabay (free): https://pixabay.com/sound-effects/
+
+SEARCH FOR:
+  ├─ "Emergency siren" → siren_extreme.wav
+  ├─ "Alarm clock" → alarm_large.wav
+  ├─ "Alert beep" → alert_medium.mp3
+  └─ "Ding notification" → ding_small.mp3
+
+STEP 4: Set File Permissions
+────────────────────────────
+
+  chmod 644 /opt/nifty_scanner/sounds/*.wav
+  chmod 644 /opt/nifty_scanner/sounds/*.mp3
+
+STEP 5: Test Sounds
+──────────────────
+
+  # Test siren
+  paplay /opt/nifty_scanner/sounds/siren_extreme.wav
+  
+  # Test alarm
+  paplay /opt/nifty_scanner/sounds/alarm_large.wav
+  
+  # Test alert
+  paplay /opt/nifty_scanner/sounds/alert_medium.mp3
+  
+  # Test ding
+  paplay /opt/nifty_scanner/sounds/ding_small.mp3
+
+STEP 6: Update Config
+────────────────────
+
+In advanced_notifications.py:
+
+NOTIFICATION_CONFIG = {
+    'sound': {
+        'enabled': True,
+        'player': 'paplay',  # or 'aplay' or 'afplay'
+        'sounds': {
+            'EXTREME': '/opt/nifty_scanner/sounds/siren_extreme.wav',
+            'LARGE': '/opt/nifty_scanner/sounds/alarm_large.wav',
+            'MEDIUM': '/opt/nifty_scanner/sounds/alert_medium.mp3',
+            'SMALL': '/opt/nifty_scanner/sounds/ding_small.mp3',
+        },
+        'volume_extreme': 100,
+        'volume_large': 90,
+        'volume_medium': 70,
+        'volume_small': 50,
+    }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3️⃣ SETUP DESKTOP NOTIFICATIONS (Linux)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Get pop-ups on your desktop when alerts happen.
+
+STEP 1: Install notify-send
+──────────────────────────
+
+  # Ubuntu/Debian
+  sudo apt-get install libnotify-bin
+  
+  # Fedora
+  sudo dnf install libnotify
+  
+  # Arch
+  sudo pacman -S libnotify
+
+STEP 2: Test Desktop Notification
+────────────────────────────────
+
+  notify-send -u critical "EXTREME ALERT" "Volume spiked 10x!"
+  
+  # Should see popup on desktop
+
+STEP 3: Enable in Config
+───────────────────────
+
+In advanced_notifications.py:
+
+NOTIFICATION_CONFIG = {
+    'system_notification': {
+        'enabled': True,
+        'timeout_ms': 10000,  # 10 seconds
+        'urgency_extreme': 'critical',
+        'urgency_large': 'critical',
+        'urgency_medium': 'normal',
+        'urgency_small': 'low',
+    }
+}
+
+HOW TO SET UP ON YOUR LAPTOP/DESKTOP:
+
+If you're running scanner on remote VPS, forward notifications to your desktop:
+
+1. SSH with X11 forwarding:
+   ssh -X user@vps.example.com
+   
+2. Then notifications appear on your local screen
+
+Or use notification relay:
+   └─ Pushbullet app on phone gets desktop notifications
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4️⃣ SETUP DISCORD WEBHOOKS (Optional)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Send alerts to Discord server (for team notifications).
+
+STEP 1: Create Discord Server (if you don't have one)
+─────────────────────────────────────────────────────
+
+  1. Open Discord
+  2. Click "+" (create server)
+  3. Name it "Trading Alerts"
+  4. Create channels:
+     ├─ #extreme-alerts (red role)
+     ├─ #large-alerts (orange role)
+     ├─ #medium-alerts (yellow role)
+     └─ #small-alerts (green role)
+
+STEP 2: Create Webhooks
+──────────────────────
+
+For each channel:
+  1. Right-click channel → "Edit Channel"
+  2. Go to "Integrations"
+  3. Click "Webhooks"
+  4. Click "Create Webhook"
+  5. Copy webhook URL
+  
+  Format: https://discord.com/api/webhooks/WEBHOOK_ID/TOKEN
+
+STEP 3: Update Config
+────────────────────
+
+In advanced_notifications.py:
+
+NOTIFICATION_CONFIG = {
+    'discord': {
+        'enabled': True,
+        'webhooks': {
+            'EXTREME': 'https://discord.com/api/webhooks/WEBHOOK_ID_1/TOKEN',
+            'LARGE': 'https://discord.com/api/webhooks/WEBHOOK_ID_2/TOKEN',
+            'MEDIUM': 'https://discord.com/api/webhooks/WEBHOOK_ID_3/TOKEN',
+        }
+    }
+}
+
+What you get:
+  ├─ Colored embed messages
+  ├─ Spike ratio shown
+  ├─ Pattern shown
+  └─ Can mention @here in webhook
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5️⃣ SETUP EMAIL ALERTS (Critical Only)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Send email for EXTREME alerts only.
+
+STEP 1: Get Gmail App Password
+──────────────────────────────
+
+  1. Go to https://myaccount.google.com/
+  2. Security → App passwords
+  3. Create password for "Mail" on "Windows Computer" (or Linux)
+  4. Google generates 16-char password
+  5. Copy this password (NOT your main password)
+
+STEP 2: Update Config
+────────────────────
+
+In advanced_notifications.py:
+
+NOTIFICATION_CONFIG = {
+    'email': {
+        'enabled': True,
+        'send_on_severity': ['EXTREME'],  # Only EXTREME
+        'smtp_server': 'smtp.gmail.com',
+        'smtp_port': 587,
+        'from_email': 'your_email@gmail.com',
+        'from_password': 'xxxx xxxx xxxx xxxx',  # 16-char app password
+        'to_emails': ['alert@example.com', 'trader@example.com'],
+        'subject_prefix': '🚨 NIFTY VOLUME ALERT',
+    }
+}
+
+STEP 3: Test Email
+─────────────────
+
+  python3 advanced_notifications.py
+  (Should send test email)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 INTEGRATION WITH SCANNER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+To use in nifty_volume_alert_scanner_advanced.py:
+
+STEP 1: Copy advanced_notifications.py to /opt/nifty_scanner/
+
+STEP 2: Import in scanner
+────────────────────────
+
+Add at top of scanner:
+
+  from advanced_notifications import send_volume_alert
+
+STEP 3: Replace current alert sending
+──────────────────────────────────────
+
+In scan_symbol() method, replace:
+
+  # OLD:
+  msg = format_detailed_alert(...)
+  send_telegram_alert(msg, is_urgent=is_urgent)
+  
+  # NEW:
+  send_volume_alert(
+      symbol=f"{symbol_key} {option_type}",
+      option_type=option_type,
+      analysis=analysis,
+      current_volume=volume,
+      avg_volume=avg_vol,
+      current_rsi=rsi,
+      avg_rsi=avg_rsi,
+      ltp=ltp,
+      price=price,
+  )
+
+STEP 4: Update scanner config
+────────────────────────────
+
+In scanner's CONFIG, remove old telegram settings:
+
+  # Remove this:
+  'telegram_bot_token': '...',
+  'telegram_chat_id': '...',
+  
+  # Now uses advanced_notifications.py config instead
+
+STEP 5: Test
+───────────
+
+  python3 advanced_notifications.py
+  
+  Should send test alert across ALL channels
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ TESTING CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After setup, test each channel:
+
+☐ Telegram EXTREME channel
+  └─ Run: python3 advanced_notifications.py
+  └─ Should see alert on phone
+
+☐ Sound alert
+  └─ Run: paplay /opt/nifty_scanner/sounds/siren_extreme.wav
+  └─ Should hear loud siren
+
+☐ Desktop notification
+  └─ Run: notify-send -u critical "TEST" "EXTREME ALERT"
+  └─ Should see popup on desktop
+
+☐ Discord webhook
+  └─ Check Discord channel
+  └─ Should see colored embed
+
+☐ Email alert
+  └─ Check inbox
+  └─ Should receive email
+
+☐ All enabled
+  └─ Run test_volume_alert()
+  └─ Should trigger all channels simultaneously
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 YOU WILL NEVER MISS AN ALERT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When EXTREME alert happens:
+  ✓ LOUD SIREN plays on VPS speaker (100% volume)
+  ✓ Desktop popup appears on your screen (critical)
+  ✓ Telegram notification on phone
+  ✓ Discord message to team
+  ✓ Email to inbox
+  
+  → IMPOSSIBLE TO MISS
+
+When LARGE alert happens:
+  ✓ Alarm sound (90% volume)
+  ✓ Desktop popup
+  ✓ Telegram notification
+  
+  → VERY HARD TO MISS
+
+When MEDIUM alert happens:
+  ✓ Alert beep (70% volume)
+  ✓ Telegram notification
+  ✓ Desktop popup (optional)
+  
+  → NOTICEABLE
+
+When SMALL alert happens:
+  ✓ Soft ding (50% volume)
+  ✓ Personal Telegram
+  
+  → FOR REFERENCE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
