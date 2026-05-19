@@ -100,7 +100,11 @@ NOTIFICATION_CONFIG = {
     
     # LOGGING
     'logging': {
-        'log_file': '/var/log/nifty_alerts_notifications.log',
+        # Log next to the script so it works on Windows and Linux (VPS) alike.
+        'log_file': os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'nifty_alerts_notifications.log',
+        ),
         'debug': False,
     }
 }
@@ -108,11 +112,22 @@ NOTIFICATION_CONFIG = {
 # ==================== LOGGING ====================
 def setup_logging():
     log_format = '%(asctime)s [%(levelname)s] %(message)s'
+    log_file = NOTIFICATION_CONFIG['logging']['log_file']
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+    # Windows console defaults to cp1252 and can't print emoji — force UTF-8.
+    import sys
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, Exception):
+            pass
+
     logging.basicConfig(
         level=logging.DEBUG if NOTIFICATION_CONFIG['logging']['debug'] else logging.INFO,
         format=log_format,
         handlers=[
-            logging.FileHandler(NOTIFICATION_CONFIG['logging']['log_file']),
+            logging.FileHandler(log_file, encoding='utf-8'),
             logging.StreamHandler(),
         ]
     )

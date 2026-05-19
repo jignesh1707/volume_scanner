@@ -20,6 +20,12 @@ from typing import Dict, List, Tuple, Optional
 import requests
 from dotenv import load_dotenv
 
+from advanced_notifications import (
+    NOTIFICATION_CONFIG,
+    NotificationManager,
+    send_volume_alert,
+)
+
 # Load .env from the same directory as this script (systemd sets
 # WorkingDirectory=/opt/volume_scanner, so a bare load_dotenv() resolves there).
 load_dotenv()
@@ -38,12 +44,9 @@ CONFIG = {
         'session_scanner.json',
     ),
     
-    # Notification
-    'telegram_bot_token': '8740544874:AAHOD7C_qVi99pZVUl9OzPttjiBv5UMOZt0',
-    'telegram_chat_id': '-1003917720485',
-    'sms_api_key': 'YOUR_SMS_API_KEY',
-    'mobile_number': 'YOUR_PHONE_NUMBER',
-    
+    # Notifications are configured in advanced_notifications.py
+    # (multi-channel Telegram routed by severity).
+
     # Scanning params
     'scan_interval_sec': 30,
     'lookback_hours': 4,
@@ -85,19 +88,33 @@ CONFIG = {
         },
     },
     
-    # Logging
-    'log_file': '/var/log/nifty_volume_alerts.log',
+    # Logging — log next to the script so it works on Windows and Linux (VPS) alike.
+    'log_file': os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'nifty_volume_alerts.log',
+    ),
     'debug': False,
 }
 
 # ==================== LOGGING ====================
 def setup_logging():
     log_format = '%(asctime)s [%(levelname)s] %(message)s'
+    log_file = CONFIG['log_file']
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+    # Windows console defaults to cp1252 and can't print emoji — force UTF-8.
+    import sys
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, Exception):
+            pass
+
     logging.basicConfig(
         level=logging.DEBUG if CONFIG['debug'] else logging.INFO,
         format=log_format,
         handlers=[
-            logging.FileHandler(CONFIG['log_file']),
+            logging.FileHandler(log_file, encoding='utf-8'),
             logging.StreamHandler(),
         ]
     )
@@ -589,33 +606,6 @@ def calculate_rsi(closes: List[float], period: int = 14) -> float:
     return rsi
 
 # ==================== NOTIFICATIONS ====================
-def send_telegram_alert(message: str, is_urgent: bool = False) -> bool:
-    """Send alert via Telegram"""
-    try:
-        url = f"https://api.telegram.org/bot{CONFIG['telegram_bot_token']}/sendMessage"
-        
-        # Add emoji urgency indicator
-        if is_urgent:
-            message = f"🚨 {message}"
-        
-        payload = {
-            'chat_id': CONFIG['telegram_chat_id'],
-            'text': message,
-            'parse_mode': 'HTML',
-        }
-        resp = requests.post(url, json=payload, timeout=5)
-        
-        if resp.status_code == 200:
-            logger.info(f"✓ Telegram alert sent")
-            return True
-        else:
-            logger.error(f"Telegram failed: {resp.text}")
-            return False
-    
-    except Exception as e:
-        logger.error(f"Telegram error: {e}")
-        return False
-
 def derive_setup_context(rsi_zone: str, rsi_slope: str, pattern: str, option_type: str) -> str:
     """One-line setup context from RSI zone + slope + pattern + side. Pure information."""
     if pattern == 'VOLUME_COMPRESSION':
@@ -648,70 +638,6 @@ def derive_setup_context(rsi_zone: str, rsi_slope: str, pattern: str, option_typ
     return f"Volume spike — RSI {rsi_zone}, {rsi_slope}"
 
 
-def format_detailed_alert(
-    symbol: str,
-    option_type: str,
-    analysis: Dict,
-    current_volume: float,
-    avg_volume: float,
-    current_rsi: float,
-    avg_rsi: float,
-    ltp: float,
-    price: float,
-    rsi_zone: str = 'neutral',
-    rsi_slope: str = 'flat',
-    setup_context: str = '',
-) -> str:
-    """Format detailed alert message"""
-
-    # Base info
-    msg = (
-        f"<b>{analysis['description']}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"<b>Symbol:</b> {symbol} {option_type}\n"
-        f"<b>LTP:</b> ₹{ltp:.2f} | <b>Close:</b> ₹{price:.2f}\n"
-    )
-
-    # Volume details
-    msg += (
-        f"<b>VOLUME DATA:</b>\n"
-        f"  Current: {current_volume:,.0f}\n"
-        f"  Avg (50-min): {avg_volume:,.0f}\n"
-        f"  Ratio: <b>{analysis['spike_ratio']:.1f}x</b>\n"
-    )
-
-    if analysis['spike_level']:
-        msg += f"  Level: <b>{analysis['spike_level']}</b>\n"
-
-    if analysis['pattern']:
-        msg += f"<b>PATTERN:</b> {analysis['pattern']}\n"
-
-    if analysis['consecutive_count'] > 0:
-        msg += f"  Consecutive candles: {analysis['consecutive_count']}\n"
-
-    # RSI — zone uses 40/60 thresholds
-    zone_labels = {
-        'oversold':   '🟢 OVERSOLD',
-        'neutral':    '🟡 NEUTRAL',
-        'overbought': '🔴 OVERBOUGHT',
-    }
-    slope_arrows = {'rising': '↑', 'falling': '↓', 'flat': '→'}
-
-    msg += (
-        f"<b>RSI:</b> {current_rsi:.1f} "
-        f"<b>{zone_labels.get(rsi_zone, rsi_zone)}</b> "
-        f"{slope_arrows.get(rsi_slope, '')} ({rsi_slope})"
-        f" | Avg: {avg_rsi:.1f}\n"
-    )
-
-    # Setup context line
-    if setup_context:
-        msg += f"📌 <b>Setup:</b> {setup_context}\n"
-
-    msg += f"<b>Time:</b> {datetime.now().strftime('%H:%M:%S')}"
-
-    return msg
-
 # ==================== SCANNER ====================
 class _NullDash:
     def heartbeat(self, **_): pass
@@ -741,6 +667,7 @@ class AdvancedVolumeScanner:
         self.trackers = {}
         self._compression_cooldown = {}
         self.dash = _build_dashboard()
+        self.notifier = NotificationManager(NOTIFICATION_CONFIG)
         self._alerts_today = 0
         self._last_day = ""
         self.initialize_trackers()
@@ -799,8 +726,7 @@ class AdvancedVolumeScanner:
                 rsi_slope = tracker.get_rsi_slope()
                 setup_context = derive_setup_context(rsi_zone, rsi_slope, analysis['pattern'], option_type)
 
-                # Format and send alert
-                msg = format_detailed_alert(
+                send_volume_alert(
                     symbol=f"{symbol_key} {option_type}",
                     option_type=option_type,
                     analysis=analysis,
@@ -814,11 +740,6 @@ class AdvancedVolumeScanner:
                     rsi_slope=rsi_slope,
                     setup_context=setup_context,
                 )
-                
-                # Determine urgency
-                is_urgent = analysis['severity'] in ['EXTREME', 'LARGE']
-
-                send_telegram_alert(msg, is_urgent=is_urgent)
                 self._alerts_today += 1
                 try:
                     self.dash.log_trade(
@@ -879,7 +800,11 @@ class AdvancedVolumeScanner:
             f"\n📌 <b>Setup:</b> Both sides quiet — premium sellers' time\n"
             f"<b>Time:</b> {datetime.now().strftime('%H:%M:%S')}"
         )
-        send_telegram_alert(msg, is_urgent=False)
+        self.notifier.send_multi_channel_alert(
+            title=f"{symbol_key} CE+PE — Volume Compression",
+            message=msg,
+            severity='SMALL',
+        )
         logger.info(f"COMPRESSION ALERT: {symbol_key} — both CE and PE volume dead")
 
     def run(self):
