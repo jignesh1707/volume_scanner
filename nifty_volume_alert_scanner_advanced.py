@@ -8,14 +8,16 @@ Detailed condition reporting for different volume patterns
 - Recovery patterns
 """
 
-import requests
+import hashlib
 import json
-import time
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-import logging
-from typing import Dict, List, Tuple
 import os
+import time
+from datetime import datetime
+from collections import deque
+import logging
+from typing import Dict, List, Tuple, Optional
+
+import requests
 from dotenv import load_dotenv
 
 # Load .env from the same directory as this script (systemd sets
@@ -24,10 +26,17 @@ load_dotenv()
 
 # ==================== CONFIG ====================
 CONFIG = {
-    # Broker APIs (Finvasia/Shoonya)
-    'broker_api_key': os.getenv('FINVASIA_API_KEY', ''),
-    'broker_token': os.getenv('FINVASIA_TOKEN', ''),
-    'broker_base_url': 'https://api.shoonya.com',
+    # Broker (Shoonya / Finvasia). Daily OAuth via login_shoonya.py — saves
+    # session_scanner.json next to this script. If that file is missing/stale,
+    # the scanner falls back to SHOONYA_AUTH_CODE in .env and runs GenAcsTok
+    # itself once at startup.
+    'broker_user':         os.getenv('SHOONYA_USER',      ''),
+    'broker_apikey':       os.getenv('SHOONYA_APIKEY',    ''),
+    'broker_auth_code':    os.getenv('SHOONYA_AUTH_CODE', ''),
+    'broker_session_file': os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'session_scanner.json',
+    ),
     
     # Notification
     'telegram_bot_token': '8740544874:AAHOD7C_qVi99pZVUl9OzPttjiBv5UMOZt0',
@@ -58,17 +67,21 @@ CONFIG = {
     'detect_recovery_pattern': True,     # Return to normal after spike
     'detect_volume_compression': True,   # Volume drying up
     
-    # Symbols to scan (ATM CALL/PUT)
+    # Symbols to scan (ATM CALL/PUT) — Shoonya tradingsymbol format:
+    #   <NAME><DD><MMM><YY><C|P><STRIKE>     e.g. NIFTY27MAY26C24500
+    # Exchange is NFO for index options (NOT NSE — NSE is for spot/equities).
+    # Update strikes + expiry each week. Use finvasia_option_symbol() helper
+    # in TickRenko/core/option_config.py if you want to script this.
     'symbols': {
         'NIFTY': {
-            'call': 'NIFTY26P23900CE',
-            'put': 'NIFTY26P23900PE',
-            'exch': 'NSE',
+            'call': 'NIFTY27MAY26C24500',
+            'put':  'NIFTY27MAY26P24500',
+            'exch': 'NFO',
         },
         'BANKNIFTY': {
-            'call': 'BANKNIFTY26P23900CE',
-            'put': 'BANKNIFTY26P23900PE',
-            'exch': 'NSE',
+            'call': 'BANKNIFTY27MAY26C55000',
+            'put':  'BANKNIFTY27MAY26P55000',
+            'exch': 'NFO',
         },
     },
     
@@ -349,64 +362,209 @@ class AdvancedVolumeTracker:
 
 # ==================== BROKER API ====================
 class BrokerAPI:
-    """Finvasia/Shoonya API wrapper"""
-    
-    def __init__(self, api_key: str, token: str, base_url: str):
-        self.api_key = api_key
-        self.token = token
-        self.base_url = base_url
-        self.session = requests.Session()
-    
-    def fetch_intraday_data(self, symbol: str, exchange: str, interval: str = '1') -> List[Dict]:
-        """Fetch 1-min intraday candles"""
+    """
+    Shoonya (Finvasia) API wrapper using NorenRestApiPy.
+
+    Auth: April-2026 OAuth compliant. login() resolves a susertoken from
+    (a) session_scanner.json if saved today, or (b) GenAcsTok exchange using
+    SHOONYA_AUTH_CODE from .env. Run login_shoonya.py each morning to
+    populate session_scanner.json — token expires EOD.
+
+    Methods consumed by the scanner:
+      fetch_intraday_data(symbol, exchange, interval='1')
+          -> [{'timestamp': iso, 'close': float, 'volume': float}, ...]
+             oldest first.
+      get_ltp(symbol, exchange) -> (ltp, volume)
+
+    Shoonya needs numeric tokens, not tradingsymbol strings — _resolve_token()
+    looks them up once via searchscrip and caches for the session.
+    """
+
+    _GENACS_ENDPOINT = "https://api.shoonya.com/NorenWClientAPI/GenAcsTok"
+
+    def __init__(self, user: str, apikey: str, auth_code: str = "",
+                 session_file: str = "session_scanner.json"):
+        from NorenRestApiPy.NorenApi import NorenApi
+
+        class _ScannerApi(NorenApi):
+            def __init__(self):
+                NorenApi.__init__(
+                    self,
+                    host='https://api.shoonya.com/NorenWClientTP/',
+                    websocket='wss://api.shoonya.com/NorenWSTP/',
+                )
+
+        self._user = user
+        self._apikey = apikey
+        self._auth_code = auth_code
+        self._session_file = session_file
+        self._api = _ScannerApi()
+        self._token_cache: Dict[Tuple[str, str], str] = {}
+        self._authenticated = False
+
+    def login(self) -> bool:
+        """Resolve a susertoken via saved session OR auth_code exchange."""
+        if self._try_saved_session():
+            self._authenticated = True
+            return True
+
+        if not self._auth_code:
+            logger.critical(
+                "Shoonya: no saved session AND no SHOONYA_AUTH_CODE in .env.\n"
+                "  Run this morning before starting:\n"
+                "      python login_shoonya.py"
+            )
+            return False
+
+        checksum = hashlib.sha256(
+            f"{self._user}{self._apikey}{self._auth_code}".encode()
+        ).hexdigest()
+        post_body = f"jData={json.dumps({'code': self._auth_code, 'checksum': checksum})}"
+
         try:
-            endpoint = f"{self.base_url}/history"
-            params = {
-                'uid': self.token,
-                'token': symbol,
-                'exch': exchange,
-                'from': (datetime.now() - timedelta(hours=5)).isoformat(),
-                'to': datetime.now().isoformat(),
-                'interval': interval,
-            }
-            
-            resp = self.session.get(endpoint, params=params, timeout=10)
-            resp.raise_for_status()
+            resp = requests.post(self._GENACS_ENDPOINT, data=post_body, timeout=15)
             data = resp.json()
-            
-            if data.get('stat') == 'Ok':
-                return data.get('data', [])
+        except Exception as exc:
+            logger.error(f"Shoonya GenAcsTok request failed: {exc}")
+            return False
+
+        if data.get("stat") != "Ok":
+            err = data.get("emsg", "unknown")
+            if any(kw in err.lower() for kw in ("invalid ip", "network", "ip")):
+                logger.critical(
+                    "Shoonya login failed: VPS IP not whitelisted. "
+                    "Fix in Shoonya Prism > API."
+                )
             else:
-                logger.warning(f"Broker API error for {symbol}: {data}")
-                return []
-        
-        except Exception as e:
-            logger.error(f"Failed to fetch data for {symbol}: {e}")
-            return []
-    
-    def get_ltp(self, symbol: str, exchange: str) -> Tuple[float, float]:
-        """Get LTP and volume"""
+                logger.error(f"Shoonya GenAcsTok login failed: {err}")
+            return False
+
+        susertoken = data.get("susertoken", "")
+        self._api.susertoken = susertoken
+        self._api.username = self._user
+        self._api.actid = self._user
+        self._persist_session(data)
+        self._authenticated = True
+        logger.info("✓ Shoonya login OK (user=%s)", data.get("uname", self._user))
+        return True
+
+    def _try_saved_session(self) -> bool:
         try:
-            endpoint = f"{self.base_url}/quote"
-            params = {
-                'uid': self.token,
-                'token': symbol,
-                'exch': exchange,
-                'mode': 'ltp',
-            }
-            
-            resp = self.session.get(endpoint, params=params, timeout=5)
-            data = resp.json()
-            
-            if data.get('stat') == 'Ok':
-                ltp = float(data.get('ltp', 0))
-                volume = float(data.get('volume', 0))
-                return ltp, volume
-            return 0, 0
-        
-        except Exception as e:
-            logger.error(f"Failed to get LTP for {symbol}: {e}")
-            return 0, 0
+            with open(self._session_file) as fh:
+                session = json.load(fh)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return False
+
+        if session.get("saved_date") != time.strftime("%Y-%m-%d"):
+            logger.info("Saved Shoonya session is stale (different day) — will re-login.")
+            return False
+
+        susertoken = session.get("susertoken", "")
+        if not susertoken:
+            return False
+
+        self._api.susertoken = susertoken
+        self._api.username = self._user
+        self._api.actid = self._user
+        logger.info("✓ Loaded saved Shoonya session from %s", self._session_file)
+        return True
+
+    def _persist_session(self, res_data: dict) -> None:
+        session = {
+            "access_token": res_data.get("access_token", ""),
+            "susertoken":   res_data.get("susertoken", ""),
+            "uid":          res_data.get("USERID", self._user),
+            "saved_date":   time.strftime("%Y-%m-%d"),
+        }
+        try:
+            with open(self._session_file, "w") as fh:
+                json.dump(session, fh, indent=2)
+        except OSError as exc:
+            logger.warning(f"Could not persist session to {self._session_file}: {exc}")
+
+    def _resolve_token(self, symbol: str, exchange: str) -> Optional[str]:
+        key = (exchange, symbol)
+        if key in self._token_cache:
+            return self._token_cache[key]
+        try:
+            resp = self._api.searchscrip(exchange=exchange, searchtext=symbol)
+        except Exception as exc:
+            logger.error(f"searchscrip failed for {symbol}: {exc}")
+            return None
+        if not resp or resp.get("stat") != "Ok":
+            logger.warning(f"searchscrip returned no match for {symbol}: {resp}")
+            return None
+        for v in resp.get("values", []):
+            if v.get("tsym") == symbol:
+                token = v.get("token", "")
+                self._token_cache[key] = token
+                return token
+        # Fallback to first match — log it so user can correct the CONFIG entry.
+        values = resp.get("values", [])
+        if values:
+            token = values[0].get("token", "")
+            logger.warning(
+                "No exact match for %s — using first hit %s (token %s). "
+                "Fix CONFIG['symbols'] if this is wrong.",
+                symbol, values[0].get("tsym"), token,
+            )
+            self._token_cache[key] = token
+            return token
+        return None
+
+    def fetch_intraday_data(self, symbol: str, exchange: str,
+                            interval: str = '1') -> List[Dict]:
+        if not self._authenticated:
+            return []
+        token = self._resolve_token(symbol, exchange)
+        if not token:
+            return []
+        try:
+            now = time.time()
+            from_ts = now - (5 * 3600)  # 5h lookback (covers lookback_hours=4)
+            resp = self._api.get_time_price_series(
+                exchange=exchange,
+                token=token,
+                starttime=from_ts,
+                endtime=now,
+                interval=interval,
+            )
+        except Exception as exc:
+            logger.error(f"get_time_price_series failed for {symbol}: {exc}")
+            return []
+        if not resp:
+            return []
+
+        candles: List[Dict] = []
+        for row in resp:
+            try:
+                candles.append({
+                    'timestamp': datetime.fromtimestamp(float(row['ssboe'])).isoformat(),
+                    'close':     float(row['intc']),
+                    'volume':    float(row.get('intv', 0) or 0),
+                })
+            except (KeyError, ValueError, TypeError) as exc:
+                logger.debug(f"Skipping malformed bar for {symbol}: {exc}")
+        # Shoonya returns newest-first; flip to oldest-first.
+        candles.reverse()
+        return candles
+
+    def get_ltp(self, symbol: str, exchange: str) -> Tuple[float, float]:
+        if not self._authenticated:
+            return 0.0, 0.0
+        token = self._resolve_token(symbol, exchange)
+        if not token:
+            return 0.0, 0.0
+        try:
+            resp = self._api.get_quotes(exchange=exchange, token=token)
+        except Exception as exc:
+            logger.error(f"get_quotes failed for {symbol}: {exc}")
+            return 0.0, 0.0
+        if resp and resp.get("stat") == "Ok":
+            ltp    = float(resp.get("lp", 0) or 0)
+            volume = float(resp.get("v",  0) or 0)
+            return ltp, volume
+        return 0.0, 0.0
 
 # ==================== INDICATORS ====================
 def calculate_rsi(closes: List[float], period: int = 14) -> float:
@@ -575,9 +733,10 @@ class AdvancedVolumeScanner:
     def __init__(self, config: Dict):
         self.config = config
         self.broker = BrokerAPI(
-            config['broker_api_key'],
-            config['broker_token'],
-            config['broker_base_url']
+            user=config['broker_user'],
+            apikey=config['broker_apikey'],
+            auth_code=config['broker_auth_code'],
+            session_file=config['broker_session_file'],
         )
         self.trackers = {}
         self._compression_cooldown = {}
@@ -783,12 +942,17 @@ class AdvancedVolumeScanner:
 # ==================== MAIN ====================
 if __name__ == '__main__':
     # Validate config
-    if not all([
-        CONFIG['broker_api_key'],
-        CONFIG['broker_token'],
-    ]):
-        logger.error("❌ Missing FINVASIA_API_KEY or FINVASIA_TOKEN in /opt/volume_scanner/.env")
+    if not all([CONFIG['broker_user'], CONFIG['broker_apikey']]):
+        logger.error(
+            "❌ Missing SHOONYA_USER or SHOONYA_APIKEY in /opt/volume_scanner/.env"
+        )
         exit(1)
-    
+
     scanner = AdvancedVolumeScanner(CONFIG)
+    if not scanner.broker.login():
+        logger.error(
+            "Shoonya login failed. Run `python login_shoonya.py` on the VPS "
+            "to refresh the daily session, then restart this service."
+        )
+        exit(1)
     scanner.run()

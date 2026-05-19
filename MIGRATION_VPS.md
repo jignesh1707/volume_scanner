@@ -5,6 +5,10 @@ collides with the **VolumeBot** install at `/opt/volumebot` (case-sensitive
 but visually confusing). This doc moves it to `/opt/volume_scanner` and
 applies the hardened systemd unit.
 
+> **2026-05-19 update:** broker layer rewritten to use NorenRestApiPy with
+> April-2026 OAuth. Daily morning login via `python login_shoonya.py` is now
+> required — see § 8 below.
+
 Run all steps **as root on the VPS**.
 
 ---
@@ -77,6 +81,44 @@ file if any remnant is left:
 ```bash
 ls -l /etc/systemd/system/nifty_scanner.service   # confirm it points at the new path
 ```
+
+## 8. Daily Shoonya login (required each morning)
+
+Shoonya susertokens expire EOD. Before market open, run the interactive
+helper:
+
+```bash
+sudo -u trading bash -c 'cd /opt/volume_scanner && python3 login_shoonya.py'
+sudo systemctl restart nifty_scanner
+```
+
+The helper writes `session_scanner.json` next to the script. The scanner
+loads that file at startup; if it's missing or stale, the service falls
+back to `SHOONYA_AUTH_CODE` in `.env` for a one-shot GenAcsTok exchange.
+
+Required `.env` vars (in `/opt/volume_scanner/.env`):
+
+```
+SHOONYA_USER=...
+SHOONYA_APIKEY=...
+# Optional — only used if session_scanner.json is missing/stale:
+SHOONYA_AUTH_CODE=
+```
+
+Install the new pip dependency once:
+
+```bash
+sudo -u trading pip install --user NorenRestApiPy
+```
+
+## 9. ATM symbol upkeep
+
+`CONFIG['symbols']` in `nifty_volume_alert_scanner_advanced.py` is hardcoded
+to a specific weekly expiry + strike (Shoonya format
+`<NAME><DD><MMM><YY><C|P><STRIKE>`, exchange `NFO`). Update the strike each
+Monday and the expiry each week. If the symbol doesn't exactly match the
+Shoonya master, the scanner logs a `searchscrip` warning and uses the first
+fuzzy hit — fix the entry when you see that warning.
 
 ---
 

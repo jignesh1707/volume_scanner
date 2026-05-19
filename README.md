@@ -1,8 +1,8 @@
 # Volume Scanner
 
-Nifty / BankNifty ATM CE/PE options volume alert scanner. Polls Finvasia /
-Shoonya API, detects volume bursts, spikes, and consecutive-candle patterns,
-and pushes Telegram alerts.
+Nifty / BankNifty ATM CE/PE options volume alert scanner. Polls Shoonya
+(Finvasia) via NorenRestApiPy with daily OAuth, detects volume bursts,
+spikes, and consecutive-candle patterns, and pushes Telegram alerts.
 
 **Doesn't trade.** Alert-only, no broker order placement.
 
@@ -33,12 +33,16 @@ sudo git clone https://github.com/jignesh1707/volume_scanner.git /opt/volume_sca
 sudo useradd --system --shell /bin/bash trading 2>/dev/null || true
 sudo apt-get install -y python3-pip
 sudo pip3 install -r /opt/volume_scanner/requirements.txt
-sudo -u trading nano /opt/volume_scanner/.env       # FINVASIA_API_KEY=..., FINVASIA_TOKEN=...
+sudo -u trading nano /opt/volume_scanner/.env       # SHOONYA_USER=..., SHOONYA_APIKEY=...
+sudo -u trading bash -c 'cd /opt/volume_scanner && python3 login_shoonya.py'   # daily OAuth
 sudo cp /opt/volume_scanner/nifty_scanner.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now nifty_scanner
 sudo journalctl -u nifty_scanner -f
 ```
+
+> Shoonya tokens expire EOD — rerun `login_shoonya.py` and restart the
+> service each morning. See [`MIGRATION_VPS.md`](MIGRATION_VPS.md) § 8.
 
 If migrating from an existing `/opt/Volumebot` install, follow
 [`MIGRATION_VPS.md`](MIGRATION_VPS.md) instead.
