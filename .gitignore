@@ -8,3 +8,4 @@ venv/
 .DS_Store
 state/
 logs/
+session_scanner.json

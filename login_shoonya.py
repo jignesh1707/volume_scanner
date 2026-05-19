@@ -29,7 +29,10 @@ import time
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env relative to this script so the helper works regardless of cwd
+# (sync_shoonya.bat invokes it from C:\trading\TickRenko\).
+_ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(_ENV_PATH)
 
 USER   = os.getenv("SHOONYA_USER",   "")
 APIKEY = os.getenv("SHOONYA_APIKEY", "")
