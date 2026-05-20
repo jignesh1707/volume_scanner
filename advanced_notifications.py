@@ -73,12 +73,11 @@ NOTIFICATION_CONFIG = {
     # SOUND ALERTS (Play audio files)
     'sound': {
         'enabled': True,
-        'player': 'paplay',  # PulseAudio (use 'aplay' for ALSA, 'afplay' for macOS)
         'sounds': {
-            'EXTREME': '/opt/nifty_scanner/sounds/siren_extreme.wav',      # Loud siren
-            'LARGE': '/opt/nifty_scanner/sounds/alarm_large.wav',          # Loud alarm
-            'MEDIUM': '/opt/nifty_scanner/sounds/alert_medium.mp3',        # Medium alert
-            'SMALL': '/opt/nifty_scanner/sounds/ding_small.mp3',           # Soft ding
+            'EXTREME': 'sounds/siren_extreme.wav',      # Loud siren
+            'LARGE': 'sounds/alarm_large.wav',          # Loud alarm
+            'MEDIUM': 'sounds/alert_medium.mp3',        # Medium alert
+            'SMALL': 'sounds/ding_small.mp3',           # Soft ding
         },
         'volume_extreme': 100,  # 0-100
         'volume_large': 90,
@@ -298,43 +297,41 @@ class SoundNotifier:
     def __init__(self, config: Dict):
         self.config = config['sound']
         self.enabled = self.config['enabled']
-        self.player = self.config['player']
-    
+        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+
     def play_sound(self, severity: str = 'MEDIUM') -> bool:
         """Play sound alert based on severity"""
         if not self.enabled or severity not in self.config['sounds']:
             return False
-        
-        sound_file = self.config['sounds'][severity]
-        
+
+        # Make path relative to script directory
+        sound_file = os.path.join(self.script_dir, self.config['sounds'][severity])
+
         # Check if sound file exists
         if not os.path.exists(sound_file):
             logger.warning(f"Sound file not found: {sound_file}")
             return False
-        
+
         try:
-            # Get volume
-            volume_map = {
-                'EXTREME': self.config['volume_extreme'],
-                'LARGE': self.config['volume_large'],
-                'MEDIUM': self.config['volume_medium'],
-                'SMALL': self.config['volume_small'],
-            }
-            volume = volume_map.get(severity, 70)
-            
-            # Play sound (non-blocking)
-            subprocess.Popen(
-                [self.player, sound_file],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            
-            logger.info(f"✓ Sound alert played ({severity}) - {sound_file}")
-            return True
-        
-        except FileNotFoundError:
-            logger.warning(f"Audio player '{self.player}' not found")
-            return False
+            import sys
+
+            if sys.platform == 'win32':
+                # Windows: use winsound module
+                import winsound
+                winsound.PlaySound(sound_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                logger.info(f"✓ Sound alert played ({severity}) - {os.path.basename(sound_file)}")
+                return True
+            else:
+                # Linux/macOS: use system audio player
+                player = 'afplay' if sys.platform == 'darwin' else 'paplay'
+                subprocess.Popen(
+                    [player, sound_file],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                logger.info(f"✓ Sound alert played ({severity}) - {os.path.basename(sound_file)}")
+                return True
+
         except Exception as e:
             logger.error(f"Sound notification failed: {e}")
             return False
