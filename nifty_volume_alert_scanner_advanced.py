@@ -8,7 +8,6 @@ Detailed condition reporting for different volume patterns
 - Recovery patterns
 """
 
-import hashlib
 import json
 import os
 import time
@@ -17,7 +16,6 @@ from collections import deque
 import logging
 from typing import Dict, List, Tuple, Optional
 
-import requests
 from dotenv import load_dotenv
 
 from advanced_notifications import (
@@ -32,13 +30,11 @@ load_dotenv()
 
 # ==================== CONFIG ====================
 CONFIG = {
-    # Broker (Shoonya / Finvasia). Daily OAuth via login_shoonya.py — saves
-    # session_scanner.json next to this script. If that file is missing/stale,
-    # the scanner falls back to SHOONYA_AUTH_CODE in .env and runs GenAcsTok
-    # itself once at startup.
-    'broker_user':         os.getenv('SHOONYA_USER',      ''),
-    'broker_apikey':       os.getenv('SHOONYA_APIKEY',    ''),
-    'broker_auth_code':    os.getenv('SHOONYA_AUTH_CODE', ''),
+    # Broker (Shoonya / Finvasia). Daily login is done out-of-band by
+    # login_shoonya.py, which writes session_scanner.json next to this
+    # script. The scanner only reads that file — if it's missing or stale
+    # the service refuses to start and prints a clear instruction.
+    'broker_user':         os.getenv('SHOONYA_USER', ''),
     'broker_session_file': os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         'session_scanner.json',
@@ -382,10 +378,10 @@ class BrokerAPI:
     """
     Shoonya (Finvasia) API wrapper using NorenRestApiPy.
 
-    Auth: April-2026 OAuth compliant. login() resolves a susertoken from
-    (a) session_scanner.json if saved today, or (b) GenAcsTok exchange using
-    SHOONYA_AUTH_CODE from .env. Run login_shoonya.py each morning to
-    populate session_scanner.json — token expires EOD.
+    Auth: read-only. login() loads the susertoken from session_scanner.json,
+    which is written each morning by login_shoonya.py (interactive password +
+    TOTP). If the file is missing or its saved_date isn't today, login()
+    returns False and the caller is expected to exit with instructions.
 
     Methods consumed by the scanner:
       fetch_intraday_data(symbol, exchange, interval='1')
@@ -397,10 +393,7 @@ class BrokerAPI:
     looks them up once via searchscrip and caches for the session.
     """
 
-    _GENACS_ENDPOINT = "https://api.shoonya.com/NorenWClientAPI/GenAcsTok"
-
-    def __init__(self, user: str, apikey: str, auth_code: str = "",
-                 session_file: str = "session_scanner.json"):
+    def __init__(self, user: str, session_file: str = "session_scanner.json"):
         from NorenRestApiPy.NorenApi import NorenApi
 
         class _ScannerApi(NorenApi):
@@ -412,92 +405,41 @@ class BrokerAPI:
                 )
 
         self._user = user
-        self._apikey = apikey
-        self._auth_code = auth_code
         self._session_file = session_file
         self._api = _ScannerApi()
         self._token_cache: Dict[Tuple[str, str], str] = {}
         self._authenticated = False
 
     def login(self) -> bool:
-        """Resolve a susertoken via saved session OR auth_code exchange."""
-        if self._try_saved_session():
-            self._authenticated = True
-            return True
-
-        if not self._auth_code:
-            logger.critical(
-                "Shoonya: no saved session AND no SHOONYA_AUTH_CODE in .env.\n"
-                "  Run this morning before starting:\n"
-                "      python login_shoonya.py"
-            )
-            return False
-
-        checksum = hashlib.sha256(
-            f"{self._user}{self._apikey}{self._auth_code}".encode()
-        ).hexdigest()
-        post_body = f"jData={json.dumps({'code': self._auth_code, 'checksum': checksum})}"
-
-        try:
-            resp = requests.post(self._GENACS_ENDPOINT, data=post_body, timeout=15)
-            data = resp.json()
-        except Exception as exc:
-            logger.error(f"Shoonya GenAcsTok request failed: {exc}")
-            return False
-
-        if data.get("stat") != "Ok":
-            err = data.get("emsg", "unknown")
-            if any(kw in err.lower() for kw in ("invalid ip", "network", "ip")):
-                logger.critical(
-                    "Shoonya login failed: VPS IP not whitelisted. "
-                    "Fix in Shoonya Prism > API."
-                )
-            else:
-                logger.error(f"Shoonya GenAcsTok login failed: {err}")
-            return False
-
-        susertoken = data.get("susertoken", "")
-        self._api.susertoken = susertoken
-        self._api.username = self._user
-        self._api.actid = self._user
-        self._persist_session(data)
-        self._authenticated = True
-        logger.info("✓ Shoonya login OK (user=%s)", data.get("uname", self._user))
-        return True
-
-    def _try_saved_session(self) -> bool:
+        """Load today's susertoken from session_scanner.json."""
         try:
             with open(self._session_file) as fh:
                 session = json.load(fh)
         except (FileNotFoundError, json.JSONDecodeError):
+            logger.critical(
+                "Shoonya: %s not found or unreadable. Run `python login_shoonya.py` first.",
+                self._session_file,
+            )
             return False
 
         if session.get("saved_date") != time.strftime("%Y-%m-%d"):
-            logger.info("Saved Shoonya session is stale (different day) — will re-login.")
+            logger.critical(
+                "Shoonya session is stale (saved %s). Run `python login_shoonya.py` to refresh.",
+                session.get("saved_date", "unknown"),
+            )
             return False
 
         susertoken = session.get("susertoken", "")
         if not susertoken:
+            logger.critical("Shoonya session file has no susertoken; re-run login_shoonya.py.")
             return False
 
         self._api.susertoken = susertoken
         self._api.username = self._user
         self._api.actid = self._user
-        logger.info("✓ Loaded saved Shoonya session from %s", self._session_file)
+        self._authenticated = True
+        logger.info("✓ Loaded Shoonya session from %s", self._session_file)
         return True
-
-    def _persist_session(self, res_data: dict) -> None:
-        session = {
-            "access_token": res_data.get("access_token", ""),
-            "susertoken":   res_data.get("susertoken", ""),
-            "uid":          res_data.get("USERID", self._user),
-            "saved_date":   time.strftime("%Y-%m-%d"),
-        }
-        try:
-            with open(self._session_file, "w") as fh:
-                json.dump(session, fh, indent=2)
-        except OSError as exc:
-            logger.warning(f"Could not persist session to {self._session_file}: {exc}")
 
     def _resolve_token(self, symbol: str, exchange: str) -> Optional[str]:
         key = (exchange, symbol)
@@ -660,8 +602,6 @@ class AdvancedVolumeScanner:
         self.config = config
         self.broker = BrokerAPI(
             user=config['broker_user'],
-            apikey=config['broker_apikey'],
-            auth_code=config['broker_auth_code'],
             session_file=config['broker_session_file'],
         )
         self.trackers = {}
@@ -866,11 +806,8 @@ class AdvancedVolumeScanner:
 
 # ==================== MAIN ====================
 if __name__ == '__main__':
-    # Validate config
-    if not all([CONFIG['broker_user'], CONFIG['broker_apikey']]):
-        logger.error(
-            "❌ Missing SHOONYA_USER or SHOONYA_APIKEY in /opt/volume_scanner/.env"
-        )
+    if not CONFIG['broker_user']:
+        logger.error("Missing SHOONYA_USER in /opt/volume_scanner/.env")
         exit(1)
 
     scanner = AdvancedVolumeScanner(CONFIG)

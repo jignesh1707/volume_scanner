@@ -33,8 +33,8 @@ sudo git clone https://github.com/jignesh1707/volume_scanner.git /opt/volume_sca
 sudo useradd --system --shell /bin/bash trading 2>/dev/null || true
 sudo apt-get install -y python3-pip
 sudo pip3 install -r /opt/volume_scanner/requirements.txt
-sudo -u trading nano /opt/volume_scanner/.env       # SHOONYA_USER=..., SHOONYA_APIKEY=...
-sudo -u trading bash -c 'cd /opt/volume_scanner && python3 login_shoonya.py'   # daily OAuth
+sudo -u trading nano /opt/volume_scanner/.env       # see .env.example for the 5 SHOONYA_* keys
+sudo -u trading bash -c 'cd /opt/volume_scanner && python3 login_shoonya.py'   # daily; prompts for 6-digit TOTP
 sudo cp /opt/volume_scanner/nifty_scanner.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now nifty_scanner

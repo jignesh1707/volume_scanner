@@ -5,9 +5,9 @@ collides with the **VolumeBot** install at `/opt/volumebot` (case-sensitive
 but visually confusing). This doc moves it to `/opt/volume_scanner` and
 applies the hardened systemd unit.
 
-> **2026-05-19 update:** broker layer rewritten to use NorenRestApiPy with
-> April-2026 OAuth. Daily morning login via `python login_shoonya.py` is now
-> required — see § 8 below.
+> **2026-05-20 update:** broker layer uses NorenRestApiPy. Daily morning
+> login via `python login_shoonya.py` is required — prompts for a 6-digit
+> TOTP and writes `session_scanner.json`. See § 8 below.
 
 Run all steps **as root on the VPS**.
 
@@ -85,7 +85,7 @@ ls -l /etc/systemd/system/nifty_scanner.service   # confirm it points at the new
 ## 8. Daily Shoonya login (required each morning)
 
 Shoonya susertokens expire EOD. Before market open, run the interactive
-helper:
+helper — it prompts for the 6-digit TOTP from your authenticator app:
 
 ```bash
 sudo -u trading bash -c 'cd /opt/volume_scanner && python3 login_shoonya.py'
@@ -93,19 +93,24 @@ sudo systemctl restart nifty_scanner
 ```
 
 The helper writes `session_scanner.json` next to the script. The scanner
-loads that file at startup; if it's missing or stale, the service falls
-back to `SHOONYA_AUTH_CODE` in `.env` for a one-shot GenAcsTok exchange.
+loads that file at startup; if the file is missing or its `saved_date`
+isn't today, the service refuses to start and the journal will tell you
+to re-run `login_shoonya.py`.
 
 Required `.env` vars (in `/opt/volume_scanner/.env`):
 
 ```
 SHOONYA_USER=...
-SHOONYA_APIKEY=...
-# Optional — only used if session_scanner.json is missing/stale:
-SHOONYA_AUTH_CODE=
+SHOONYA_PASSWORD=...
+SHOONYA_VENDOR_CODE=...        # usually <USER>_U
+SHOONYA_API_SECRET=...         # "API Secret" from Shoonya Prism > API
+SHOONYA_IMEI=scanner1          # any non-empty string
 ```
 
-Install the new pip dependency once:
+`chmod 600 /opt/volume_scanner/.env` and own it `trading:trading` —
+password lives in plaintext here, TOTP does not.
+
+Install the pip dependency once:
 
 ```bash
 sudo -u trading pip install --user NorenRestApiPy
