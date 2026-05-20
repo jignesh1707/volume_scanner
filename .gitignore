@@ -9,3 +9,4 @@ venv/
 state/
 logs/
 session_scanner.json
+.claude/
