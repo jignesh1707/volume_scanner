@@ -30,14 +30,20 @@ load_dotenv()
 
 # ==================== CONFIG ====================
 CONFIG = {
-    # Broker (Shoonya / Finvasia). Daily login is done out-of-band by
-    # login_shoonya.py, which writes session_scanner.json next to this
-    # script. The scanner only reads that file — if it's missing or stale
-    # the service refuses to start and prints a clear instruction.
-    'broker_user':         os.getenv('SHOONYA_USER', ''),
-    'broker_session_file': os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        'session_scanner.json',
+    # Broker: Fyers (API v3). Daily login is done out-of-band by
+    # TickRenko/sync_fyers.bat on the Windows machine, which logs in once,
+    # then scps the resulting token to /opt/shared/state/fyers_tokens.json
+    # on the VPS (mode 0640, group=trading) and restarts the bots. This
+    # scanner only READS that file — never refreshes it. If the file is
+    # missing or stale the service refuses to start.
+    #
+    # FYERS_TOKEN_PATH (.env override) is useful for local Windows dev: set
+    # it to e.g. C:\trading\TickRenko\state\fyers_tokens.json so the scanner
+    # can run on the same machine where sync_fyers.bat produces the token.
+    'fyers_client_id': os.getenv('FYERS_CLIENT_ID', ''),
+    'fyers_token_file': os.getenv(
+        'FYERS_TOKEN_PATH',
+        '/opt/shared/state/fyers_tokens.json',
     ),
     
     # Notifications are configured in advanced_notifications.py
@@ -66,21 +72,22 @@ CONFIG = {
     'detect_recovery_pattern': True,     # Return to normal after spike
     'detect_volume_compression': True,   # Volume drying up
     
-    # Symbols to scan (ATM CALL/PUT) — Shoonya tradingsymbol format:
-    #   <NAME><DD><MMM><YY><C|P><STRIKE>     e.g. NIFTY27MAY26C24500
-    # Exchange is NFO for index options (NOT NSE — NSE is for spot/equities).
-    # Update strikes + expiry each week. Use finvasia_option_symbol() helper
-    # in TickRenko/core/option_config.py if you want to script this.
+    # Symbols to scan (ATM CALL/PUT) — Fyers symbol format:
+    #   Weekly  NSE:<NAME><YY><M><DD><STRIKE><CE/PE>
+    #           e.g. NSE:NIFTY2652624500CE  (NIFTY 26-May-2026 24500 CE)
+    #           M is a single char: 1-9 for Jan-Sep, O/N/D for Oct/Nov/Dec.
+    #   Monthly NSE:<NAME><YY><MMM><STRIKE><CE/PE>
+    #           e.g. NSE:NIFTY26MAY24500CE  (last expiry of May 2026)
+    # Update strikes + expiry each week. Helper available:
+    #   TickRenko/core/option_config.py::fyers_option_symbol(index, expiry, strike, opt_type)
     'symbols': {
         'NIFTY': {
-            'call': 'NIFTY27MAY26C24500',
-            'put':  'NIFTY27MAY26P24500',
-            'exch': 'NFO',
+            'call': 'NSE:NIFTY2652624500CE',
+            'put':  'NSE:NIFTY2652624500PE',
         },
         'BANKNIFTY': {
-            'call': 'BANKNIFTY27MAY26C55000',
-            'put':  'BANKNIFTY27MAY26P55000',
-            'exch': 'NFO',
+            'call': 'NSE:BANKNIFTY26MAY55000CE',
+            'put':  'NSE:BANKNIFTY26MAY55000PE',
         },
     },
     
@@ -376,153 +383,139 @@ class AdvancedVolumeTracker:
 # ==================== BROKER API ====================
 class BrokerAPI:
     """
-    Shoonya (Finvasia) API wrapper using NorenRestApiPy.
+    Fyers API v3 read-only wrapper.
 
-    Auth: read-only. login() loads the susertoken from session_scanner.json,
-    which is written each morning by login_shoonya.py (interactive password +
-    TOTP). If the file is missing or its saved_date isn't today, login()
-    returns False and the caller is expected to exit with instructions.
+    Auth: this scanner shares the daily access token written by
+    TickRenko/sync_fyers.bat. That batch file runs login_fyers.py once each
+    morning on the Windows machine, then scps the resulting token to
+    /opt/shared/state/fyers_tokens.json on the VPS (chown root:trading,
+    mode 0640) and restarts the bots so they reload the token.
+
+    The scanner only READS that file; it never refreshes it. If the file
+    is missing or its saved_date is not today, login() refuses to start
+    and prints instructions pointing at sync_fyers.bat.
 
     Methods consumed by the scanner:
-      fetch_intraday_data(symbol, exchange, interval='1')
+      fetch_intraday_data(symbol, interval='1')
           -> [{'timestamp': iso, 'close': float, 'volume': float}, ...]
              oldest first.
-      get_ltp(symbol, exchange) -> (ltp, volume)
-
-    Shoonya needs numeric tokens, not tradingsymbol strings — _resolve_token()
-    looks them up once via searchscrip and caches for the session.
+      get_ltp(symbol) -> (ltp, day_volume)
     """
 
-    def __init__(self, user: str, session_file: str = "session_scanner.json"):
-        from NorenRestApiPy.NorenApi import NorenApi
-
-        class _ScannerApi(NorenApi):
-            def __init__(self):
-                NorenApi.__init__(
-                    self,
-                    host='https://api.shoonya.com/NorenWClientTP/',
-                    websocket='wss://api.shoonya.com/NorenWSTP/',
-                )
-
-        self._user = user
-        self._session_file = session_file
-        self._api = _ScannerApi()
-        self._token_cache: Dict[Tuple[str, str], str] = {}
+    def __init__(self, client_id: str, token_file: str):
+        self._client_id    = client_id
+        self._token_file   = token_file
+        self._fyers        = None
         self._authenticated = False
 
     def login(self) -> bool:
-        """Load today's susertoken from session_scanner.json."""
+        """Load today's access_token from the shared Fyers token file."""
         try:
-            with open(self._session_file) as fh:
-                session = json.load(fh)
-        except (FileNotFoundError, json.JSONDecodeError):
+            from fyers_apiv3 import fyersModel  # type: ignore
+        except ImportError:
             logger.critical(
-                "Shoonya: %s not found or unreadable. Run `python login_shoonya.py` first.",
-                self._session_file,
+                "fyers-apiv3 not installed. Run: pip install fyers-apiv3"
+            )
+            return False
+
+        try:
+            with open(self._token_file) as fh:
+                session = json.load(fh)
+        except (FileNotFoundError, PermissionError, json.JSONDecodeError) as exc:
+            logger.critical(
+                "Fyers token file %s unreadable (%s). Run sync_fyers.bat "
+                "on the Windows machine to refresh and push it to the VPS.",
+                self._token_file, exc,
             )
             return False
 
         if session.get("saved_date") != time.strftime("%Y-%m-%d"):
             logger.critical(
-                "Shoonya session is stale (saved %s). Run `python login_shoonya.py` to refresh.",
+                "Fyers token is stale (saved %s). Run sync_fyers.bat on the "
+                "Windows machine to refresh.",
                 session.get("saved_date", "unknown"),
             )
             return False
 
-        susertoken = session.get("susertoken", "")
-        if not susertoken:
-            logger.critical("Shoonya session file has no susertoken; re-run login_shoonya.py.")
+        access_token = session.get("access_token", "")
+        if not access_token:
+            logger.critical("Fyers token file has no access_token; re-run sync_fyers.bat.")
             return False
 
-        self._api.susertoken = susertoken
-        self._api.username = self._user
-        self._api.actid = self._user
+        # log_path must be a writable directory; co-locate Fyers SDK logs
+        # next to the scanner so they land under WorkingDirectory.
+        log_dir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            self._fyers = fyersModel.FyersModel(
+                client_id=self._client_id,
+                token=access_token,
+                is_async=False,
+                log_path=log_dir,
+            )
+        except Exception as exc:
+            logger.critical("Failed to instantiate FyersModel: %s", exc)
+            return False
+
         self._authenticated = True
-        logger.info("✓ Loaded Shoonya session from %s", self._session_file)
+        logger.info("✓ Loaded Fyers session from %s", self._token_file)
         return True
 
-    def _resolve_token(self, symbol: str, exchange: str) -> Optional[str]:
-        key = (exchange, symbol)
-        if key in self._token_cache:
-            return self._token_cache[key]
-        try:
-            resp = self._api.searchscrip(exchange=exchange, searchtext=symbol)
-        except Exception as exc:
-            logger.error(f"searchscrip failed for {symbol}: {exc}")
-            return None
-        if not resp or resp.get("stat") != "Ok":
-            logger.warning(f"searchscrip returned no match for {symbol}: {resp}")
-            return None
-        for v in resp.get("values", []):
-            if v.get("tsym") == symbol:
-                token = v.get("token", "")
-                self._token_cache[key] = token
-                return token
-        # Fallback to first match — log it so user can correct the CONFIG entry.
-        values = resp.get("values", [])
-        if values:
-            token = values[0].get("token", "")
-            logger.warning(
-                "No exact match for %s — using first hit %s (token %s). "
-                "Fix CONFIG['symbols'] if this is wrong.",
-                symbol, values[0].get("tsym"), token,
-            )
-            self._token_cache[key] = token
-            return token
-        return None
-
-    def fetch_intraday_data(self, symbol: str, exchange: str,
+    def fetch_intraday_data(self, symbol: str,
                             interval: str = '1') -> List[Dict]:
         if not self._authenticated:
             return []
-        token = self._resolve_token(symbol, exchange)
-        if not token:
-            return []
         try:
-            now = time.time()
-            from_ts = now - (5 * 3600)  # 5h lookback (covers lookback_hours=4)
-            resp = self._api.get_time_price_series(
-                exchange=exchange,
-                token=token,
-                starttime=from_ts,
-                endtime=now,
-                interval=interval,
-            )
+            now     = int(time.time())
+            from_ts = now - (5 * 3600)  # 5h lookback covers lookback_hours=4
+            resp = self._fyers.history(data={
+                "symbol":      symbol,
+                "resolution":  str(interval),
+                "date_format": "0",
+                "range_from":  str(from_ts),
+                "range_to":    str(now),
+                "cont_flag":   "1",
+            })
         except Exception as exc:
-            logger.error(f"get_time_price_series failed for {symbol}: {exc}")
-            return []
-        if not resp:
+            logger.error(f"history failed for {symbol}: {exc}")
             return []
 
+        if not resp or resp.get("s") != "ok":
+            if resp:
+                logger.warning(
+                    "history returned non-ok for %s: %s",
+                    symbol, resp.get("message", resp),
+                )
+            return []
+
+        # Fyers returns [[ts, open, high, low, close, volume], ...] oldest first.
         candles: List[Dict] = []
-        for row in resp:
+        for row in resp.get("candles", []):
             try:
                 candles.append({
-                    'timestamp': datetime.fromtimestamp(float(row['ssboe'])).isoformat(),
-                    'close':     float(row['intc']),
-                    'volume':    float(row.get('intv', 0) or 0),
+                    'timestamp': datetime.fromtimestamp(float(row[0])).isoformat(),
+                    'close':     float(row[4]),
+                    'volume':    float(row[5] or 0),
                 })
-            except (KeyError, ValueError, TypeError) as exc:
+            except (IndexError, ValueError, TypeError) as exc:
                 logger.debug(f"Skipping malformed bar for {symbol}: {exc}")
-        # Shoonya returns newest-first; flip to oldest-first.
-        candles.reverse()
         return candles
 
-    def get_ltp(self, symbol: str, exchange: str) -> Tuple[float, float]:
+    def get_ltp(self, symbol: str) -> Tuple[float, float]:
         if not self._authenticated:
             return 0.0, 0.0
-        token = self._resolve_token(symbol, exchange)
-        if not token:
-            return 0.0, 0.0
         try:
-            resp = self._api.get_quotes(exchange=exchange, token=token)
+            resp = self._fyers.quotes(data={"symbols": symbol})
         except Exception as exc:
-            logger.error(f"get_quotes failed for {symbol}: {exc}")
+            logger.error(f"quotes failed for {symbol}: {exc}")
             return 0.0, 0.0
-        if resp and resp.get("stat") == "Ok":
-            ltp    = float(resp.get("lp", 0) or 0)
-            volume = float(resp.get("v",  0) or 0)
-            return ltp, volume
+        if resp and resp.get("s") == "ok":
+            try:
+                d = resp["d"][0]["v"]
+                ltp    = float(d.get("lp",     0) or 0)
+                volume = float(d.get("volume", 0) or 0)
+                return ltp, volume
+            except (IndexError, KeyError, TypeError):
+                pass
         return 0.0, 0.0
 
 # ==================== INDICATORS ====================
@@ -601,8 +594,8 @@ class AdvancedVolumeScanner:
     def __init__(self, config: Dict):
         self.config = config
         self.broker = BrokerAPI(
-            user=config['broker_user'],
-            session_file=config['broker_session_file'],
+            client_id=config['fyers_client_id'],
+            token_file=config['fyers_token_file'],
         )
         self.trackers = {}
         self._compression_cooldown = {}
@@ -631,7 +624,7 @@ class AdvancedVolumeScanner:
         tracker = self.trackers[tracker_key]
         
         # Fetch latest candle
-        candles = self.broker.fetch_intraday_data(symbol, symbol_data['exch'], interval='1')
+        candles = self.broker.fetch_intraday_data(symbol, interval='1')
         if not candles:
             logger.warning(f"No candle data for {symbol}")
             return
@@ -659,7 +652,7 @@ class AdvancedVolumeScanner:
                 # Get stats
                 avg_vol = tracker.get_avg_volume()
                 avg_rsi = tracker.get_avg_rsi()
-                ltp, _ = self.broker.get_ltp(symbol, symbol_data['exch'])
+                ltp, _ = self.broker.get_ltp(symbol)
                 price = tracker.get_current_price()
 
                 rsi_zone = tracker.get_rsi_zone()
@@ -806,15 +799,17 @@ class AdvancedVolumeScanner:
 
 # ==================== MAIN ====================
 if __name__ == '__main__':
-    if not CONFIG['broker_user']:
-        logger.error("Missing SHOONYA_USER in /opt/volume_scanner/.env")
+    if not CONFIG['fyers_client_id']:
+        logger.error("Missing FYERS_CLIENT_ID in /opt/volume_scanner/.env")
         exit(1)
 
     scanner = AdvancedVolumeScanner(CONFIG)
     if not scanner.broker.login():
         logger.error(
-            "Shoonya login failed. Run `python login_shoonya.py` on the VPS "
-            "to refresh the daily session, then restart this service."
+            "Fyers token unavailable. Run sync_fyers.bat on the Windows "
+            "machine to refresh /opt/shared/state/fyers_tokens.json on the "
+            "VPS, then restart this service (the bat file restarts it for you "
+            "when 'nifty_scanner' is in SERVICES)."
         )
         exit(1)
     scanner.run()
